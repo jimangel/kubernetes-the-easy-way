@@ -7,7 +7,7 @@
 
 #### SET VARIABLES ####
 
-variable "kubernetes_version" { default = "1.17.5" }
+variable "kubernetes_version" { default = "1.18.2" }
 variable "do_token" {}
 variable "pub_key" {}
 variable "pvt_key" {}
