@@ -70,12 +70,12 @@ Build the cluster:
 ./build-cluster.sh
 ```
 
-It should take ~6 minutes to complete
+It should take ~5 minutes to complete
 
 ```
-real	5m4.381s
-user	0m6.583s
-sys	0m3.828s
+real	4m24.201s
+user	0m6.580s
+sys	0m3.029s
 ```
 
 Check it out!
