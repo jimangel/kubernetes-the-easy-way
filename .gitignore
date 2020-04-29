@@ -1,5 +1,6 @@
 # info file
 info.txt
+ca.*
 
 # Local .terraform directories
 **/.terraform/*

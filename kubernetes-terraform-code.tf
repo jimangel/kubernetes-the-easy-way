@@ -1,27 +1,31 @@
 #### TODO ####
-# custom-kubeadm config (kubelet, API, PSP, audit, etc)
-# containerd
-# automate version k8s (https://storage.googleapis.com/kubernetes-release/release/stable.txt)
-# speed up
+# containerd?
 # secure with kube-bench / kube-hunter / firewall rules
 # multi-master
 # LB
 # block storage
-# clean up kubeadm errors
-# disable swap
 
 #### SET VARIABLES ####
 
+variable "kubernetes_version" { default = "1.17.5" }
 variable "do_token" {}
 variable "pub_key" {}
 variable "pvt_key" {}
 variable "ssh_fingerprint" {}
-#varible "k8s_version" {}
 
-#### CONFIGURE PROVIDER ####
+#### CONFIGURE CLOUD PROVIDER ####
 
 provider "digitalocean" {
   token = var.do_token
+}
+
+#### DEFINE KUBEADM TEMPLATE ####
+
+data "template_file" "kubeadm_config" {
+  template = file("${path.module}/kubeadm-config.tpl")
+  vars = {
+    kubernetes_version = var.kubernetes_version
+  }
 }
 
 #### CREATE CONTROL PLANE NODES ####
@@ -37,7 +41,8 @@ resource "digitalocean_droplet" "control_plane" {
   ssh_keys = [
     var.ssh_fingerprint,
   ]
-  connection {
+
+connection {
     user        = "root"
     host        = self.ipv4_address
     type        = "ssh"
@@ -46,38 +51,46 @@ resource "digitalocean_droplet" "control_plane" {
     agent       = false
   }
 
-provisioner "local-exec" {
-    command = "echo ${self.name} IP-ADDRESS == ${self.ipv4_address} >> info.txt"
+#### RENDER KUBEADM CONFIG ####
+
+provisioner "file" {
+  content      = data.template_file.kubeadm_config.rendered
+  destination = "/tmp/kubeadm-config.yaml"
   }
 
- provisioner "remote-exec" {
-    inline = [
-      # add remote repos (docker, kubernetes)
-      "curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -",
-      "sudo add-apt-repository 'deb [arch=amd64] https://download.docker.com/linux/ubuntu bionic stable'",
+provisioner "remote-exec" {
+  inline = [
+      #  GENERAL REPO SPEEDUP
+      "echo '' > /etc/apt/sources.list",
+      "add-apt-repository 'deb [arch=amd64] http://mirrors.digitalocean.com/ubuntu/ bionic main restricted'",
+      # ADD KUBERNETES REPO
       "curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -",
       "echo 'deb http://apt.kubernetes.io/ kubernetes-xenial main' | sudo tee -a /etc/apt/sources.list.d/kubernetes.list",
-      "sudo apt update && sudo apt install -y apt-transport-https -f",
-      # install docker
-      "sudo apt install docker-ce -y -f",
-      # install kubernetes components
-      "sudo apt install -y kubectl=1.18.2-00 kubelet=1.18.2-00 kubeadm=1.18.2-00 -f",
-      # initialize the Master node.
-      "kubeadm init  --kubernetes-version v1.18.2 --pod-network-cidr=10.217.0.0/16 --token=ff6edf.38d10317aa6fa57e --ignore-preflight-errors=all"
+      # INSTALL KUBEADM PRE-REQS
+      "apt update && sudo apt install -y apt-transport-https -f",
+      # KUBEADM TWEAKS
+      "modprobe br_netfilter",
+      "printf 'net.bridge.bridge-nf-call-iptables = 1\nnet.ipv4.ip_forward = 1\nnet.bridge.bridge-nf-call-ip6tables = 1\n' > /etc/sysctl.d/k8s.conf",
+      "sysctl --system",
+      # INSTALL DOCKER
+      "curl -L https://get.docker.io | sudo bash",
+      # INSTALL KUBEADM
+      "apt install -y kubectl=${var.kubernetes_version}-00 kubelet=${var.kubernetes_version}-00 kubeadm=${var.kubernetes_version}-00 -f",
+      # KUBEADM INIT THE CONTROL PLANE
+      "kubeadm init --config=/tmp/kubeadm-config.yaml"
     ]
- }
+  }
 
- provisioner "remote-exec" {
-    inline = [
-      "mkdir -p /root/.kube",
-      "sudo cp -i /etc/kubernetes/admin.conf /root/.kube/config",
-      "sudo chown $(id -u):$(id -g) /root/.kube/config",
-      "kubectl apply -f https://raw.githubusercontent.com/cilium/cilium/v1.7/install/kubernetes/quick-install.yaml"
+provisioner "remote-exec" {
+  inline = [
+    # INSTALL CALICO CNI
+    "mkdir -p /root/.kube",
+    "sudo cp -i /etc/kubernetes/admin.conf /root/.kube/config",
+    "sudo chown $(id -u):$(id -g) /root/.kube/config",
+    "kubectl apply -f https://raw.githubusercontent.com/cilium/cilium/v1.7/install/kubernetes/quick-install.yaml"
     ]
- }
-
+  }
 }
-
 
 #### CREATE WORKER NODES ####
 
@@ -91,6 +104,7 @@ private_networking = true
 ssh_keys = [
   var.ssh_fingerprint,
 ]
+
 connection {
   user        = "root"
   host        = self.ipv4_address
@@ -98,33 +112,41 @@ connection {
   private_key = file(var.pvt_key)
   timeout     = "2m"
   agent       = false
-}
-
-provisioner "local-exec" {
-    command = "echo ${self.name} IP-ADDRESS == ${self.ipv4_address} >> info.txt"
   }
 
+#### RENDER KUBEADM CONFIG ####
 
- provisioner "remote-exec" {
-    inline = [
-      # add remote repos (docker, kubernetes)
-      "curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -",
-      "sudo add-apt-repository 'deb [arch=amd64] https://download.docker.com/linux/ubuntu bionic stable'",
+provisioner "file" {
+  content      = data.template_file.kubeadm_config.rendered
+  destination = "/tmp/kubeadm-config.yaml"
+  }  
+
+provisioner "remote-exec" {
+  inline = [
+      #  GENERAL REPO SPEEDUP
+      "echo '' > /etc/apt/sources.list",
+      "add-apt-repository 'deb [arch=amd64] http://mirrors.digitalocean.com/ubuntu/ bionic main restricted'",
+      # ADD KUBERNETES REPO
       "curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -",
       "echo 'deb http://apt.kubernetes.io/ kubernetes-xenial main' | sudo tee -a /etc/apt/sources.list.d/kubernetes.list",
-      "sudo apt update && sudo apt install -y apt-transport-https -f",
-      # install docker
-      "sudo apt install docker-ce -y -f",
-      # install kubernetes components
-      "sudo apt install -y kubectl=1.18.2-00 kubelet=1.18.2-00 kubeadm=1.18.2-00 -f",
-      # join cluster
-      "kubeadm join --ignore-preflight-errors=all --token ff6edf.38d10317aa6fa57e '${digitalocean_droplet.control_plane[0].ipv4_address}':6443 --discovery-token-unsafe-skip-ca-verification"
+      # INSTALL KUBEADM PRE-REQS
+      "apt update && sudo apt install -y apt-transport-https -f",
+      # KUBEADM TWEAKS
+      "modprobe br_netfilter",
+      "printf 'net.bridge.bridge-nf-call-iptables = 1\nnet.ipv4.ip_forward = 1\nnet.bridge.bridge-nf-call-ip6tables = 1\n' > /etc/sysctl.d/k8s.conf",
+      "sysctl --system",
+      # INSTALL DOCKER
+      "curl -L https://get.docker.io | sudo bash",
+      # INSTALL KUBEADM
+      "apt install -y kubectl=${var.kubernetes_version}-00 kubelet=${var.kubernetes_version}-00 kubeadm=${var.kubernetes_version}-00 -f",
+      # KUBEADM JOIN THE WORKER
+      "sed -i 's/kube-apiserver/${digitalocean_droplet.control_plane[0].ipv4_address}/g' /tmp/kubeadm-config.yaml",
+      "kubeadm join --config=/tmp/kubeadm-config.yaml"
     ]
- }
-
+  }
 }
 
-#### OUTPUT VARIABLES FOR USE ####
+#### OUTPUT VARIABLES ####
 
 output "control_plane_ip" {
   value = digitalocean_droplet.control_plane.*.ipv4_address

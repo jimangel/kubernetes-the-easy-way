@@ -1,13 +1,21 @@
 #!/bin/bash
 
-# these boys don't export well.
-export TF_VAR_do_token=${DO_PAT}
-export TF_VAR_pub_key=$HOME/.ssh/id_rsa.pub
-export TF_VAR_pvt_key=$HOME/.ssh/id_rsa
-export TF_VAR_ssh_fingerprint="$(ssh-keygen -E md5 -lf ~/.ssh/id_rsa.pub | awk '{print $2}' | cut -c 5-)"
+# Set your SSH keys to import here
+# https://www.digitalocean.com/community/tutorials/how-to-set-up-ssh-keys-on-ubuntu-1804
+PUBLIC_KEY="$HOME/.ssh/id_rsa.pub"
+PRIVATE_KEY="$HOME/.ssh/id_rsa"
+
+# error if DigitalOcean Access Token isn't set
+if [[ -z "${DO_PAT}" ]]; then
+    printf "\n*******************************************************\n"
+    printf "Makes sure you've exported your DO_PAT token variable\n"
+    printf "export DO_PAT=b4fec39662e1543fc9ac76b6ca9bba9ba6b9ab9bc7b9ab0a\n"
+    printf "*******************************************************\n"
+    exit 0
+fi
 
 # swap vars out
-terraform destroy --force
+terraform destroy --force -var "do_token=${DO_PAT}" -var "pub_key=$PUBLIC_KEY" -var "pvt_key=$PRIVATE_KEY" -var "ssh_fingerprint=$(ssh-keygen -E md5 -lf $PRIVATE_KEY | awk '{print $2}' | cut -c 5-)"
 
 # if file exists delete it
 [ -e info.txt ] && rm -rf info.txt

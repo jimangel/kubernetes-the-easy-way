@@ -20,7 +20,7 @@ The default configuration will create (3) 2GB nodes ($10 a month or $0.015 an ho
 ### Cluster Details
 
 * [kubernetes](https://github.com/kubernetes/kubernetes) v1.18.2
-* [docker-ce](https://github.com/docker/docker-ce) v19.03.8
+* [docker](https://github.com/docker/docker-ce) v19.03.8
 * [coredns](https://github.com/coredns/coredns) v1.6.7
 * [cilium cni](https://github.com/cilium/cilium) v1.7.2
 * [etcd](https://github.com/coreos/etcd) v3.4.3
@@ -49,6 +49,8 @@ The default configuration will create (3) 2GB nodes ($10 a month or $0.015 an ho
     cat $HOME/.ssh/id_rsa.pub
     cat $HOME/.ssh/id_rsa
     ```
+
+    > Note: the location can be changed in [./build-cluster.sh](/build-cluster.sh) & [./destroy-cluster.sh](/destroy-cluster.sh)
 
 ### Deploy Kubernetes
 
@@ -97,6 +99,9 @@ ssh root@$(terraform output -json worker_ip | jq -r .[0])
 
 # worker-2
 ssh root@$(terraform output -json worker_ip | jq -r .[1])
+
+# from a node view versions
+ctr -n k8s.io -a /run/containerd/containerd.sock images ls
 ```
 
 Deploy NGINX
