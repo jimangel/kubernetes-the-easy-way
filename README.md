@@ -1,9 +1,8 @@
 # Kubernetes The Easy Way
 
-
 This tutorial walks you through setting up Kubernetes the easy way. This guide is for people looking to bootstrap a cluster not managed by a cloud provider.
 
-"not managed" means you  manage the control-plane as opposed to a cloud provider. This gives you full control of the cluster.
+"not managed" means the control-plane is managed by you as opposed to a cloud provider. This gives you full control of the cluster's configuration (OIDC, FeatureGates, AuditLogs, etc).
 
 Kubernetes The Easy Way is a complement to [Kubernetes The Hard Way](https://github.com/kelseyhightower/kubernetes-the-hard-way). Once you understand the hard way, use this tutorial to expand your knowledge in a multi-node lab.
 
@@ -17,12 +16,12 @@ The default configuration will create (3) 2GB nodes ($10 a month or $0.015 an ho
 
 > Note: ONLY TESTED ON UBUNTU 18.04
 
-### Cluster Details
+### Cluster details
 
 * [kubernetes](https://github.com/kubernetes/kubernetes) v1.18.2
 * [docker](https://github.com/docker/docker-ce) v19.03.8
 * [coredns](https://github.com/coredns/coredns) v1.6.7
-* [cilium cni](https://github.com/cilium/cilium) v1.7.2
+* [cilium cni](https://github.com/cilium/cilium) v1.7.3
 * [etcd](https://github.com/coreos/etcd) v3.4.3
 
 ### Prerequisites
@@ -32,7 +31,7 @@ The default configuration will create (3) 2GB nodes ($10 a month or $0.015 an ho
 - Export a [DigitalOcean Personal Access Token](https://www.digitalocean.com/docs/apis-clis/api/create-personal-access-token/) with **WRITE** access:
 
     ```
-    export DO_PAT=b4fec39662e1543fc9ac76b6ca9bba9ba6b9ab9bc7b9ab0a
+    export DO_PAT="<DIGITALOCEAN PERSONAL ACCESS TOKEN>"
     ```
 
 ### Assumptions
@@ -50,7 +49,7 @@ The default configuration will create (3) 2GB nodes ($10 a month or $0.015 an ho
     cat $HOME/.ssh/id_rsa
     ```
 
-    > Note: the location can be changed in [./build-cluster.sh](/build-cluster.sh) & [./destroy-cluster.sh](/destroy-cluster.sh)
+    > Note: the location can be changed in [./create-cluster.sh](/create-cluster.sh) & [./destroy-cluster.sh](/destroy-cluster.sh)
 
 ### Deploy Kubernetes
 
@@ -67,7 +66,7 @@ Build the cluster:
 **WARNING:** this will overwrite your `~/.kube/config` file
 
 ```
-./build-cluster.sh
+./create-cluster.sh
 ```
 
 It should take ~6 minutes to complete
@@ -87,7 +86,7 @@ kubectl get pods -A
 
 ---
 
-### Smoke Test
+### Smoke test
 
 SSH into any of the nodes:
 ```
@@ -99,9 +98,6 @@ ssh root@$(terraform output -json worker_ip | jq -r .[0])
 
 # worker-2
 ssh root@$(terraform output -json worker_ip | jq -r .[1])
-
-# from a node view versions
-ctr -n k8s.io -a /run/containerd/containerd.sock images ls
 ```
 
 Deploy NGINX
@@ -114,8 +110,12 @@ kubectl port-forward deployment/nginx 80:80
 
 ---
 
-### Cleaning Up
+### Cleaning up
 
 ```
 ./destroy-cluster.sh
 ```
+
+### Additional resources:
+
+- How to [add a DigitalOcean CCM](docs/add-digitalocean-ccm.md) for dynamic LB provisioning.

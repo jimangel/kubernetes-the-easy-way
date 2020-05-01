@@ -9,7 +9,7 @@ PRIVATE_KEY="$HOME/.ssh/id_rsa"
 if [[ -z "${DO_PAT}" ]]; then
     printf "\n*******************************************************\n"
     printf "Makes sure you've exported your DO_PAT token variable\n"
-    printf "export DO_PAT=b4fec39662e1543fc9ac76b6ca9bba9ba6b9ab9bc7b9ab0a\n"
+    printf "export DO_PAT=\"<DIGITALOCEAN PERSONAL ACCESS TOKEN>\"\n"
     printf "*******************************************************\n"
     exit 0
 fi

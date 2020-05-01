@@ -1,13 +1,16 @@
 #### TODO ####
-# containerd?
-# secure with kube-bench / kube-hunter / firewall rules
+# drop some of the kubeadm tweaks
+# lock-in versions of all components
+# containerd swap
+# s/cgroupfs/systemd
+# security
 # multi-master
-# LB
 # block storage
 
 #### SET VARIABLES ####
 
 variable "kubernetes_version" { default = "1.18.2" }
+variable "pod_subnet" { default = "10.217.0.0/16" }
 variable "do_token" {}
 variable "pub_key" {}
 variable "pvt_key" {}
@@ -19,15 +22,6 @@ provider "digitalocean" {
   token = var.do_token
 }
 
-#### DEFINE KUBEADM TEMPLATE ####
-
-data "template_file" "kubeadm_config" {
-  template = file("${path.module}/kubeadm-config.tpl")
-  vars = {
-    kubernetes_version = var.kubernetes_version
-  }
-}
-
 #### CREATE CONTROL PLANE NODES ####
 
 resource "digitalocean_droplet" "control_plane" {
@@ -35,7 +29,6 @@ resource "digitalocean_droplet" "control_plane" {
   image              = "ubuntu-18-04-x64"
   name               = format("control-plane-%v", count.index + 1)
   region             = "nyc3"
-  #size               = "512mb"
   size               = "2gb"
   private_networking = true
   ssh_keys = [
@@ -54,7 +47,7 @@ connection {
 #### RENDER KUBEADM CONFIG ####
 
 provisioner "file" {
-  content      = data.template_file.kubeadm_config.rendered
+  content = templatefile("${path.module}/kubeadm-config.tpl", { kubernetes_version = var.kubernetes_version, pod_subnet = var.pod_subnet, control_plane_ip = digitalocean_droplet.control_plane[0].ipv4_address })
   destination = "/tmp/kubeadm-config.yaml"
   }
 
@@ -85,8 +78,8 @@ provisioner "remote-exec" {
   inline = [
     # INSTALL CALICO CNI
     "mkdir -p /root/.kube",
-    "sudo cp -i /etc/kubernetes/admin.conf /root/.kube/config",
-    "sudo chown $(id -u):$(id -g) /root/.kube/config",
+    "cp -i /etc/kubernetes/admin.conf /root/.kube/config",
+    "chown $(id -u):$(id -g) /root/.kube/config",
     "kubectl apply -f https://raw.githubusercontent.com/cilium/cilium/v1.7/install/kubernetes/quick-install.yaml"
     ]
   }
@@ -117,9 +110,9 @@ connection {
 #### RENDER KUBEADM CONFIG ####
 
 provisioner "file" {
-  content      = data.template_file.kubeadm_config.rendered
+  content = templatefile("${path.module}/kubeadm-config.tpl", { kubernetes_version = var.kubernetes_version, pod_subnet = var.pod_subnet, control_plane_ip = digitalocean_droplet.control_plane[0].ipv4_address })
   destination = "/tmp/kubeadm-config.yaml"
-  }  
+  } 
 
 provisioner "remote-exec" {
   inline = [
@@ -140,7 +133,6 @@ provisioner "remote-exec" {
       # INSTALL KUBEADM
       "apt install -y kubectl=${var.kubernetes_version}-00 kubelet=${var.kubernetes_version}-00 kubeadm=${var.kubernetes_version}-00 -f",
       # KUBEADM JOIN THE WORKER
-      "sed -i 's/kube-apiserver/${digitalocean_droplet.control_plane[0].ipv4_address}/g' /tmp/kubeadm-config.yaml",
       "kubeadm join --config=/tmp/kubeadm-config.yaml"
     ]
   }
