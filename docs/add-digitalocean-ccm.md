@@ -17,7 +17,7 @@ EOF
 ### Deploy CCM
 
 ```
-kubectl apply -f https://raw.githubusercontent.com/digitaloceandigitalocean-cloud-controller-manager/master/releases/v0.1.24.yml
+kubectl apply -f https://raw.githubusercontent.com/digitalocean/digitalocean-cloud-controller-manager/master/releases/v0.1.24.yml
 ```
 
 ### Example service (nginx LB on port 80)

@@ -21,7 +21,7 @@ The default configuration will create (3) 2GB nodes ($10 a month or $0.015 an ho
 * [kubernetes](https://github.com/kubernetes/kubernetes) v1.18.2
 * [docker](https://github.com/docker/docker-ce) v19.03.8
 * [coredns](https://github.com/coredns/coredns) v1.6.7
-* [cilium cni](https://github.com/cilium/cilium) v1.7.3
+* [cilium cni](https://github.com/cilium/cilium) v1.7.2
 * [etcd](https://github.com/coreos/etcd) v3.4.3
 
 ### Prerequisites
@@ -106,6 +106,11 @@ kubectl create deployment nginx --image=nginx
 kubectl expose deployment/nginx --port 80
 kubectl port-forward deployment/nginx 80:80
 # visit localhost in a browser
+```
+
+Run Cilium connectivity test
+```
+kubectl apply -f https://raw.githubusercontent.com/cilium/cilium/v1.7.2/examples/kubernetes/connectivity-check/connectivity-check.yaml
 ```
 
 ---

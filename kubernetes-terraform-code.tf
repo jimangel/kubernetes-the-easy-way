@@ -11,6 +11,8 @@
 
 variable "kubernetes_version" { default = "1.18.2" }
 variable "pod_subnet" { default = "10.217.0.0/16" }
+variable "dc_region" { default = "nyc3" }
+# https://www.digitalocean.com/docs/platform/availability-matrix/#datacenter-regions
 variable "do_token" {}
 variable "pub_key" {}
 variable "pvt_key" {}
@@ -27,8 +29,8 @@ provider "digitalocean" {
 resource "digitalocean_droplet" "control_plane" {
   count              = 1
   image              = "ubuntu-18-04-x64"
-  name               = format("control-plane-%v", count.index + 1)
-  region             = "nyc3"
+  name               = format("control-plane-%s-%v", var.dc_region, count.index + 1)
+  region             = var.dc_region
   size               = "2gb"
   private_networking = true
   ssh_keys = [
@@ -70,17 +72,16 @@ provisioner "remote-exec" {
       # INSTALL KUBEADM
       "apt install -y kubectl=${var.kubernetes_version}-00 kubelet=${var.kubernetes_version}-00 kubeadm=${var.kubernetes_version}-00 -f",
       # KUBEADM INIT THE CONTROL PLANE
-      "kubeadm init --config=/tmp/kubeadm-config.yaml"
+      "kubeadm init --config=/tmp/kubeadm-config.yaml",
+      # SETUP KUBECTL LOCALLY
+     "mkdir -p /root/.kube && cp -i /etc/kubernetes/admin.conf /root/.kube/config && chown $(id -u):$(id -g) /root/.kube/config"
     ]
   }
 
 provisioner "remote-exec" {
   inline = [
     # INSTALL CALICO CNI
-    "mkdir -p /root/.kube",
-    "cp -i /etc/kubernetes/admin.conf /root/.kube/config",
-    "chown $(id -u):$(id -g) /root/.kube/config",
-    "kubectl apply -f https://raw.githubusercontent.com/cilium/cilium/v1.7/install/kubernetes/quick-install.yaml"
+    "kubectl apply -f https://raw.githubusercontent.com/cilium/cilium/v1.7.2/install/kubernetes/quick-install.yaml"
     ]
   }
 }
@@ -90,8 +91,8 @@ provisioner "remote-exec" {
 resource "digitalocean_droplet" "worker" {
 count              = 2
 image              = "ubuntu-18-04-x64"
-name               = format("worker-%v", count.index + 1)
-region             = "nyc3"
+name               = format("worker-%s-%v", var.dc_region, count.index + 1)
+region             = var.dc_region
 size               = "2gb"
 private_networking = true
 ssh_keys = [
@@ -137,6 +138,8 @@ provisioner "remote-exec" {
     ]
   }
 }
+
+#### OUTPUT VARIABLES ####
 
 #### OUTPUT VARIABLES ####
 
