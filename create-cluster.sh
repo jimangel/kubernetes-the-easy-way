@@ -21,5 +21,3 @@ terraform init
 #terraform plan -var "do_token=${DO_PAT}" -var "pub_key=$PUBLIC_KEY" -var "pvt_key=$PRIVATE_KEY" -var "ssh_fingerprint=$(ssh-keygen -E md5 -lf $PRIVATE_KEY | awk '{print $2}' | cut -c 5-)"
 
 terraform apply -auto-approve -var "do_token=${DO_PAT}" -var "pub_key=$PUBLIC_KEY" -var "pvt_key=$PRIVATE_KEY" -var "ssh_fingerprint=$(ssh-keygen -E md5 -lf $PRIVATE_KEY | awk '{print $2}' | cut -c 5-)"
-
-scp -q -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no root@$(terraform output -json control_plane_ip | jq -r .[0]):/root/.kube/config ~/.kube/.

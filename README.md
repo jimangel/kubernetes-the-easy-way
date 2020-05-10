@@ -12,7 +12,7 @@ Kubernetes The Easy Way is a complement to [Kubernetes The Hard Way](https://git
 
 Terraform is used to deploy and destroy a Kubernetes cluster on DigitalOcean via kubeadm. By default, the script deploys 1 control-plane-node and 2 worker-nodes.
 
-The default configuration will create (3) 2GB nodes ($10 a month or $0.015 an hour). I use it to spin up, test, and tear down. Total cost of ownership is $30 a month or $0.045 an hour. If I spun up a cluster and tested for 24 hours then destroyed it, it would cost $1.08 - pretty affordable!
+The default configuration will create (3) 2CPUx2GB nodes ($15 a month or $0.02232 an hour). I use it to spin up, test, and tear down. Total cost of ownership is $45 a month or $0.067 an hour. If I spun up a cluster and tested for 24 hours then destroyed it, it would cost $1.60 - pretty affordable!
 
 > Note: ONLY TESTED ON UBUNTU 18.04
 
@@ -22,7 +22,7 @@ The default configuration will create (3) 2GB nodes ($10 a month or $0.015 an ho
 * [docker](https://github.com/docker/docker-ce) v19.03.8
 * [coredns](https://github.com/coredns/coredns) v1.6.7
 * [cilium cni](https://github.com/cilium/cilium) v1.7.2
-* [etcd](https://github.com/coreos/etcd) v3.4.3
+* [ubuntu](https://ubuntu.com/) 18.04 LTS
 
 ### Prerequisites
 
@@ -62,8 +62,6 @@ cd kubernetes-the-easy-way
 
 
 Build the cluster:
-
-**WARNING:** this will overwrite your `~/.kube/config` file
 
 ```
 ./create-cluster.sh
@@ -124,3 +122,4 @@ kubectl apply -f https://raw.githubusercontent.com/cilium/cilium/v1.7.2/examples
 ### Additional resources:
 
 - How to [add a DigitalOcean CCM](docs/add-digitalocean-ccm.md) for dynamic LB provisioning.
+- How to [create multi-region clusters](docs/multi-cluster-testing.md) for advance testing.

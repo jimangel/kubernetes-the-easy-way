@@ -1,6 +1,6 @@
-# info file
-info.txt
-ca.*
+# Ignore certs and kubeconfig files
+*.conf
+*.crt
 
 # Local .terraform directories
 **/.terraform/*

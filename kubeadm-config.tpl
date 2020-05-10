@@ -7,7 +7,7 @@ bootstrapTokens:
 ---
 apiVersion: kubeadm.k8s.io/v1beta2
 kind: ClusterConfiguration
-clusterName: kubernetes-the-easy-way
+clusterName: ${cluster_name}
 kubernetesVersion: ${kubernetes_version}
 networking:
   podSubnet: "${pod_subnet}"
