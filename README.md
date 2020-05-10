@@ -86,7 +86,7 @@ kubectl get pods -A
 
 ### Smoke test
 
-SSH into any of the nodes:
+SSH into any of the nodes
 ```
 # control-plane-1
 ssh root@$(terraform output -json control_plane_ip | jq -r .[0])
@@ -109,6 +109,11 @@ kubectl port-forward deployment/nginx 80:80
 Run Cilium connectivity test
 ```
 kubectl apply -f https://raw.githubusercontent.com/cilium/cilium/v1.7.2/examples/kubernetes/connectivity-check/connectivity-check.yaml
+```
+
+Use cluster context
+```
+kubectl config use-context $(terraform output cluster_context)
 ```
 
 ---

@@ -20,7 +20,8 @@ cd nyc3
 to use
 
 ```
-kubectl config use-context ktew-nyc3
+# kubectl config use-context $(terraform output cluster_context)
+kubectl config use-context ktew-2q9pmg-nyc3
 ```
 
 ### Provision second cluster in SFO2
@@ -35,13 +36,14 @@ sed -i 's/default = "nyc3"/default = "sfo2"/g' kubernetes-terraform-code.tf
 to use
 
 ```
-kubectl config use-context ktew-sfo2
+# kubectl config use-context $(terraform output cluster_context)
+kubectl config use-context ktew-s9fwpd-sfo2
 ```
 
 ### Switch between the two clusters using contexts
 
 ```
-kubectl config use-context ktew-nyc3
+kubectl config use-context ktew-2q9pmg-nyc3
 
 kubectl get nodes
 NAME                   STATUS   ROLES    AGE     VERSION
@@ -49,7 +51,7 @@ control-plane-nyc3-1   Ready    master   2m26s   v1.18.2
 worker-nyc3-1          Ready    <none>   64s     v1.18.2
 worker-nyc3-2          Ready    <none>   64s     v1.18.2
 
-kubectl config use-context ktew-sfo2
+kubectl config use-context ktew-s9fwpd-sfo2
 
 kubectl get nodes
 NAME                   STATUS   ROLES    AGE    VERSION
@@ -65,10 +67,10 @@ Show all contexts
 
 ```
 kubectl config get-contexts
-CURRENT   NAME                         CLUSTER     AUTHINFO           NAMESPACE
-          kind-kind                    kind-kind   kind-kind          
-          ktew-nyc3                    ktew-nyc3   admin-ktew-nyc3    
-*         ktew-sfo2                    ktew-sfo2   admin-ktew-sfo2  
+CURRENT   NAME                         CLUSTER            AUTHINFO           NAMESPACE
+          kind-kind                    kind-kind          kind-kind          
+          ktew-nyc3                    ktew-2q9pmg-nyc3   admin-ktew-2q9pmg-nyc3    
+*         ktew-sfo2                    ktew-s9fwpd-sfo2   admin-ktew-s9fwpd-sfo2  
 ```
 
 Set default namespace for current context

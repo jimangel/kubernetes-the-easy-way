@@ -36,6 +36,18 @@ variable "ssh_fingerprint" {}
 
 provider "digitalocean" { token = var.do_token }
 
+###########################################################
+#### GENERATE RANDOM STRING FOR UNIQUE KUBECTL CONTEXT ####
+###########################################################
+
+resource "random_string" "lower" {
+  length  = 6
+  upper   = false
+  lower   = true
+  number  = true
+  special = false
+}
+
 ######################################
 #### CREATE CONTROL PLANE NODE(S) ####
 ######################################
@@ -119,8 +131,8 @@ resource "null_resource" "kubectl_configure" {
 
 # I use this pointless trigger to reference "self" on destroy...
 triggers = {
-    cluster_name = format("ktew-%s", var.dc_region)
-    admin_name = format("admin-ktew-%s", var.dc_region) 
+    cluster_name = format("ktew-%s-%s", random_string.lower.result, var.dc_region)
+    admin_name = format("admin-ktew-%s-%s", random_string.lower.result, var.dc_region) 
   }
 
 provisioner "local-exec" {
@@ -241,6 +253,6 @@ output "worker_ip" {
 }
 
 output "cluster_context" {
-  value = "kubectl config use-context ${format("ktew-%s", var.dc_region)}"
-  description = "kubectl cluster-info --context ..."
+  value = format("ktew-%s-%s", random_string.lower.result, var.dc_region)
+  description = "kubectl config use-context --context ..."
 }
