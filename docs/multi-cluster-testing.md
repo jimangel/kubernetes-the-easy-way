@@ -1,6 +1,12 @@
+## Multi Region Clusters
+
 I wanted to be able to create clusters in different regions with the goal of testing https://cilium.io/blog/2019/03/12/clustermesh/ and multi-cluster workloads.
 
 Review the available Digital Ocean regions and short-names here: https://www.digitalocean.com/docs/platform/availability-matrix/#datacenter-regions
+
+### Before you start
+
+Please review the [README.md](../README.md)
 
 ### Provision one cluster (default NYC3)
 
