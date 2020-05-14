@@ -54,7 +54,7 @@ resource "random_string" "lower" {
 
 resource "digitalocean_droplet" "control_plane" {
   count              = 1
-  image              = "ubuntu-18-04-x64"
+  image              = "ubuntu-20-04-x64"
   name               = format("control-plane-%s-%v", var.dc_region, count.index + 1)
   region             = var.dc_region
   size               = var.droplet_size
@@ -94,13 +94,20 @@ provisioner "file" {
 provisioner "remote-exec" {
     inline = [
       # GENERAL REPO SPEEDUP
+      "until [ -f /var/lib/cloud/instance/boot-finished ]; do sleep 1; done",
       "echo '' > /etc/apt/sources.list",
-      "add-apt-repository 'deb [arch=amd64] http://mirrors.digitalocean.com/ubuntu/ bionic main restricted'",
+      "add-apt-repository 'deb [arch=amd64] http://mirrors.digitalocean.com/ubuntu/ focal main restricted universe'",
       # ADD KUBERNETES REPO
       "curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -",
-      "echo 'deb http://apt.kubernetes.io/ kubernetes-xenial main' | sudo tee -a /etc/apt/sources.list.d/kubernetes.list",
+      "add-apt-repository 'deb http://apt.kubernetes.io/ kubernetes-xenial main'",
+      #"echo 'deb http://apt.kubernetes.io/ kubernetes-xenial main' | sudo tee -a /etc/apt/sources.list.d/kubernetes.list",
       # INSTALL DOCKER
-      "export VERSION=${var.docker_version} && curl -L https://get.docker.io | bash",
+      "curl -s https://download.docker.com/linux/ubuntu/gpg | apt-key add -",
+      "add-apt-repository 'deb [arch=amd64] https://download.docker.com/linux/ubuntu eoan stable'",
+      #"echo 'deb http://apt.kubernetes.io/ kubernetes-xenial main' | sudo tee -a /etc/apt/sources.list.d/kubernetes.list",
+      #"export VERSION=${var.docker_version} && curl -L https://get.docker.io | bash",
+      #"apt update && apt install -y docker.io=${var.docker_version}-0ubuntu1",
+      "apt install -y docker-ce=5:${var.docker_version}~3-0~ubuntu-eoan",
       # INSTALL KUBEADM
       "apt install -y kubectl=${var.kubernetes_version}-00 kubelet=${var.kubernetes_version}-00 kubeadm=${var.kubernetes_version}-00 -f",
       # KUBEADM INIT THE CONTROL PLANE
@@ -185,7 +192,7 @@ lifecycle {
 
 resource "digitalocean_droplet" "worker" {
   count              = 2
-  image              = "ubuntu-18-04-x64"
+  image              = "ubuntu-20-04-x64"
   name               = format("worker-%s-%v", var.dc_region, count.index + 1)
   region             = var.dc_region
   size               = var.droplet_size
@@ -225,13 +232,20 @@ provisioner "file" {
 provisioner "remote-exec" {
   inline = [
       # GENERAL REPO SPEEDUP
+      "until [ -f /var/lib/cloud/instance/boot-finished ]; do sleep 1; done",
       "echo '' > /etc/apt/sources.list",
-      "add-apt-repository 'deb [arch=amd64] http://mirrors.digitalocean.com/ubuntu/ bionic main restricted'",
+      "add-apt-repository 'deb [arch=amd64] http://mirrors.digitalocean.com/ubuntu/ focal main restricted universe'",
       # ADD KUBERNETES REPO
       "curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -",
-      "echo 'deb http://apt.kubernetes.io/ kubernetes-xenial main' | sudo tee -a /etc/apt/sources.list.d/kubernetes.list",
+      "add-apt-repository 'deb http://apt.kubernetes.io/ kubernetes-xenial main'",
+      #"echo 'deb http://apt.kubernetes.io/ kubernetes-xenial main' | sudo tee -a /etc/apt/sources.list.d/kubernetes.list",
       # INSTALL DOCKER
-      "export VERSION=${var.docker_version} && curl -L https://get.docker.io | bash",
+      "curl -s https://download.docker.com/linux/ubuntu/gpg | apt-key add -",
+      "add-apt-repository 'deb [arch=amd64] https://download.docker.com/linux/ubuntu eoan stable'",
+      #"echo 'deb http://apt.kubernetes.io/ kubernetes-xenial main' | sudo tee -a /etc/apt/sources.list.d/kubernetes.list",
+      #"export VERSION=${var.docker_version} && curl -L https://get.docker.io | bash",
+      #"apt update && apt install -y docker.io=${var.docker_version}-0ubuntu1",
+      "apt install -y docker-ce=5:${var.docker_version}~3-0~ubuntu-eoan",
       # INSTALL KUBEADM
       "apt install -y kubectl=${var.kubernetes_version}-00 kubelet=${var.kubernetes_version}-00 kubeadm=${var.kubernetes_version}-00 -f",
       # KUBEADM JOIN THE WORKER

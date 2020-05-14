@@ -11,6 +11,14 @@ clusterName: ${cluster_name}
 kubernetesVersion: ${kubernetes_version}
 networking:
   podSubnet: "${pod_subnet}"
+controllerManager:
+  extraArgs:
+    node-monitor-grace-period: "16s"
+    node-monitor-period: "2s"
+apiServer:
+  extraArgs:
+    default-not-ready-toleration-seconds: "30"
+    default-unreachable-toleration-seconds: "30"
 ---
 apiVersion: kubeadm.k8s.io/v1beta2
 kind: JoinConfiguration
