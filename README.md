@@ -127,4 +127,5 @@ kubectl config use-context $(terraform output cluster_context)
 ### Additional resources:
 
 - How to [add a DigitalOcean CCM](docs/add-digitalocean-ccm.md) for dynamic LB provisioning.
+- How to [deploy an ingress controller with SSL](docs/ingress-controller.md) for external traffic.
 - How to [create multi-region clusters](docs/multi-cluster-testing.md) for advance testing.
