@@ -18,7 +18,7 @@ The default configuration will create (3) 2CPUx2GB nodes ($15 a month or $0.0223
 
 ### Cluster details
 
-* [kubernetes](https://github.com/kubernetes/kubernetes) v1.18.2
+* [kubernetes](https://github.com/kubernetes/kubernetes) v1.18.3
 * [docker](https://github.com/docker/docker-ce) v19.03.8
 * [coredns](https://github.com/coredns/coredns) v1.6.7
 * [cilium cni](https://github.com/cilium/cilium) v1.7.2
@@ -126,6 +126,15 @@ kubectl config use-context $(terraform output cluster_context)
 
 ### Additional resources:
 
+Most of these resources are meant to be completed in order and build on each previous guide.
+
 - How to [add a DigitalOcean CCM](docs/add-digitalocean-ccm.md) for dynamic LB provisioning.
-- How to [deploy an ingress controller with SSL](docs/ingress-controller.md) for external traffic.
-- How to [create multi-region clusters](docs/multi-cluster-testing.md) for advance testing.
+- How to [deploy an ingress controller](docs/ingress-controller.md) for external traffic.
+- How to [install cert-manager](docs/certmanager.md) for automatic SSL certs.
+- How to [use Dex as an OIDC provider](docs/setup-dex-oidc.md) for kubectl authentication with GitHub.
+- How to [create multi-region clusters](docs/multi-cluster-testing.md) for advanced testing.
+
+(upcoming resources)
+
+- prometheus / grafana
+- harbor

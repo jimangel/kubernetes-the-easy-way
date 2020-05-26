@@ -17,7 +17,10 @@ fi
 # swap vars out
 terraform destroy --force -var "do_token=${DO_PAT}" -var "pub_key=$PUBLIC_KEY" -var "pvt_key=$PRIVATE_KEY" -var "ssh_fingerprint=$(ssh-keygen -E md5 -lf $PRIVATE_KEY | awk '{print $2}' | cut -c 5-)"
 
-# if file exists delete it
-[ -e info.txt ] && rm -rf info.txt
+# check the number of loadbalancers running
+LB_COUNT=$(curl -s -H "Authorization: Bearer $DO_PAT" "https://api.digitalocean.com/v2/load_balancers" |  jq -r .meta.total)
+
+# if running more than 0, error
+if [ $LB_COUNT -ne 0 ]; then printf "\n\n***\nWARNING: You have running loadbalancers in DigitalOcean which you are paying for. You may not have removed all loadbalancers created by the CCM, check Digital Ocean if not intended\n***\n\n"; fi
 
 exit 0
