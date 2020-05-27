@@ -102,6 +102,7 @@ helm upgrade -i dex-helm stable/dex \
 --set ingress.tls[0].secretName="dex-secret" \
 --set grpc=false \
 --set certs.web.secret.tlsName="dex-secret" \
+--set config.enablePasswordDB=false \
 --set config.issuer=https://dex.${DOMAIN} \
 --set config.connectors[0].type="github" \
 --set config.connectors[0].id="github" \
