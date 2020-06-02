@@ -14,7 +14,7 @@
 # https://github.com/kubernetes/sig-release/blob/master/releases/patch-releases.md#timelines
 variable "kubernetes_version" { default = "1.18.3" }
 # https://github.com/docker/docker-ce/releases
-variable "docker_version" { default = "19.03.8" }
+variable "docker_version" { default = "19.03.11" }
 # https://github.com/cilium/cilium/releases
 variable "clilium_version" { default = "1.7.2" }
 variable "pod_subnet" { default = "10.217.0.0/16" }
