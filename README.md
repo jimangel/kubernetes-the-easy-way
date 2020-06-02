@@ -102,8 +102,8 @@ Deploy NGINX
 ```
 kubectl create deployment nginx --image=nginx
 kubectl expose deployment/nginx --port 80
-kubectl port-forward deployment/nginx 80:80
-# visit localhost in a browser
+kubectl port-forward deployment/nginx 8080:80
+# visit http://localhost:8080 in a browser
 ```
 
 Run Cilium connectivity test

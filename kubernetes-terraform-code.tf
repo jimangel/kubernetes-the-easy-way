@@ -174,6 +174,8 @@ provisioner "local-exec" {
 provisioner "local-exec" {
   when    = destroy
   command = <<EOT
+    # removes all LBs potentailly created by CCMs
+    kubectl delete --all svc --all-namespaces
     kubectl config unset users.${self.triggers.admin_name};
     kubectl config unset contexts.${self.triggers.cluster_name};
     kubectl config unset clusters.${self.triggers.cluster_name}
