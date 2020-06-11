@@ -132,6 +132,7 @@ Most of these resources are meant to be completed in order and build on each pre
 - How to [deploy an ingress controller](docs/ingress-controller.md) for external traffic.
 - How to [install cert-manager](docs/certmanager.md) for automatic SSL certs.
 - How to [use Dex as an OIDC provider](docs/setup-dex-oidc.md) for kubectl authentication with GitHub.
+- How to [deploy the Prometheus Operator](docs/setup-prometheus-operator.md) for monitoring.
 - How to [create multi-region clusters](docs/multi-cluster-testing.md) for advanced testing.
 
 (upcoming resources)
