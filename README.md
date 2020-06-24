@@ -18,10 +18,10 @@ The default configuration will create (3) 2CPUx2GB nodes ($15 a month or $0.0223
 
 ### Cluster details
 
-* [kubernetes](https://github.com/kubernetes/kubernetes) v1.18.3
+* [kubernetes](https://github.com/kubernetes/kubernetes) v1.18.4
 * [docker](https://github.com/docker/docker-ce) v19.03.11
 * [coredns](https://github.com/coredns/coredns) v1.6.7
-* [cilium cni](https://github.com/cilium/cilium) v1.7.2
+* [cilium cni](https://github.com/cilium/cilium) v1.8.0
 * [ubuntu](https://ubuntu.com/) 20.04 LTS
 
 ### Prerequisites
@@ -38,18 +38,30 @@ The default configuration will create (3) 2CPUx2GB nodes ($15 a month or $0.0223
 
 - kubectl is [installed](https://kubernetes.io/docs/tasks/tools/install-kubectl/) locally
 
-- You have the [following files](https://www.digitalocean.com/community/tutorials/how-to-set-up-ssh-keys-on-ubuntu-1804):
+- You have a default [SSH key](https://www.digitalocean.com/community/tutorials/how-to-set-up-ssh-keys-on-ubuntu-1804):
 
     ```
-    $HOME/.ssh/id_rsa.pub
-    $HOME/.ssh/id_rsa
+    # check by running
+    ls -l ~/.ssh/id_rsa.pub
+
+    # if not found, run the following command (enter to take defaults)
+    ssh-keygen
+
+    # add the key to your ssh agent
+    ssh-add ~/.ssh/id_rsa
+    ```
     
-    # verify with:
-    cat $HOME/.ssh/id_rsa.pub
-    cat $HOME/.ssh/id_rsa
-    ```
+    To create and/or use a unique SSH key:
 
-    > Note: the location can be changed in [./create-cluster.sh](/create-cluster.sh) & [./destroy-cluster.sh](/destroy-cluster.sh)
+    ```
+    # create
+    ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa_ktew
+    ssh-add ~/.ssh/id_rsa_ktew
+    
+    # use
+    export PUBLIC_KEY="~/.ssh/id_rsa_ktew.pub"
+    export PRIVATE_KEY="~/.ssh/id_rsa_ktew"
+    ```
 
 ### Deploy Kubernetes
 

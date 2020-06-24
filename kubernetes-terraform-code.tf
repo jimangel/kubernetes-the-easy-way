@@ -12,11 +12,11 @@
 ##################################
 
 # https://github.com/kubernetes/sig-release/blob/master/releases/patch-releases.md#timelines
-variable "kubernetes_version" { default = "1.18.3" }
+variable "kubernetes_version" { default = "1.18.4" }
 # https://github.com/docker/docker-ce/releases
 variable "docker_version" { default = "19.03.11" }
 # https://github.com/cilium/cilium/releases
-variable "clilium_version" { default = "1.7.2" }
+variable "clilium_version" { default = "1.8.0" }
 variable "pod_subnet" { default = "10.217.0.0/16" }
 # https://www.digitalocean.com/docs/platform/availability-matrix/#datacenter-regions
 variable "dc_region" { default = "nyc3" }
@@ -28,7 +28,6 @@ variable "do_token" {}
 # set in `*-cluster.sh` scripts
 variable "pub_key" {}
 variable "pvt_key" {}
-variable "ssh_fingerprint" {}
 
 ##################################
 #### CONFIGURE CLOUD PROVIDER ####
@@ -52,6 +51,12 @@ resource "random_string" "lower" {
 #### CREATE CONTROL PLANE NODE(S) ####
 ######################################
 
+# Use SSH key
+resource "digitalocean_ssh_key" "default" {
+  name       = "Terraform Example"
+  public_key = file(var.pub_key)
+}
+
 resource "digitalocean_droplet" "control_plane" {
   count              = 1
   image              = "ubuntu-20-04-x64"
@@ -59,9 +64,7 @@ resource "digitalocean_droplet" "control_plane" {
   region             = var.dc_region
   size               = var.droplet_size
   private_networking = true
-  ssh_keys = [
-    var.ssh_fingerprint,
-  ]
+  ssh_keys           = [digitalocean_ssh_key.default.fingerprint]
 
 connection {
     user        = "root"
@@ -199,9 +202,8 @@ resource "digitalocean_droplet" "worker" {
   region             = var.dc_region
   size               = var.droplet_size
   private_networking = true
-  ssh_keys = [
-    var.ssh_fingerprint,
-  ]
+  ssh_keys           = [digitalocean_ssh_key.default.fingerprint]
+
 
 connection {
   user        = "root"
