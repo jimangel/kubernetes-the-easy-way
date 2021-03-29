@@ -12,11 +12,11 @@
 ##################################
 
 # https://github.com/kubernetes/sig-release/blob/master/releases/patch-releases.md#timelines
-variable "kubernetes_version" { default = "1.18.4" }
+variable "kubernetes_version" { default = "1.20.5" }
 # https://github.com/docker/docker-ce/releases
-variable "docker_version" { default = "19.03.11" }
+variable "docker_version" { default = "20.10.5" }
 # https://github.com/cilium/cilium/releases
-variable "clilium_version" { default = "1.8.0" }
+variable "clilium_version" { default = "1.9.5" }
 variable "pod_subnet" { default = "10.217.0.0/16" }
 # https://www.digitalocean.com/docs/platform/availability-matrix/#datacenter-regions
 variable "dc_region" { default = "nyc3" }
@@ -52,9 +52,9 @@ resource "random_string" "lower" {
 ######################################
 
 # Use SSH key
-resource "digitalocean_ssh_key" "default" {
-  name       = "Terraform Example"
-  public_key = file(var.pub_key)
+resource "digitalocean_ssh_key" "terraform" {
+  name       = "terraform-tf-cloud"
+  public_key = var.pub_key
 }
 
 resource "digitalocean_droplet" "control_plane" {
@@ -64,13 +64,13 @@ resource "digitalocean_droplet" "control_plane" {
   region             = var.dc_region
   size               = var.droplet_size
   private_networking = true
-  ssh_keys           = [digitalocean_ssh_key.default.fingerprint]
+  ssh_keys           = [digitalocean_ssh_key.terraform.id]
 
 connection {
     user        = "root"
     host        = self.ipv4_address
     type        = "ssh"
-    private_key = file(var.pvt_key)
+    private_key = var.pvt_key
     timeout     = "2m"
     agent       = false
   }
@@ -106,11 +106,14 @@ provisioner "remote-exec" {
       #"echo 'deb http://apt.kubernetes.io/ kubernetes-xenial main' | sudo tee -a /etc/apt/sources.list.d/kubernetes.list",
       # INSTALL DOCKER
       "curl -s https://download.docker.com/linux/ubuntu/gpg | apt-key add -",
-      "add-apt-repository 'deb [arch=amd64] https://download.docker.com/linux/ubuntu eoan stable'",
-      #"echo 'deb http://apt.kubernetes.io/ kubernetes-xenial main' | sudo tee -a /etc/apt/sources.list.d/kubernetes.list",
-      #"export VERSION=${var.docker_version} && curl -L https://get.docker.io | bash",
-      #"apt update && apt install -y docker.io=${var.docker_version}-0ubuntu1",
-      "apt install -y docker-ce=5:${var.docker_version}~3-0~ubuntu-eoan",
+      "add-apt-repository 'deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable'",
+      "apt install -y docker-ce=5:${var.docker_version}~3-0~ubuntu-focal",
+      # KUBEADM TWEAKS
+      "printf 'overlay\nbr_netfilter\n' > /etc/modules-load.d/containerd.conf",
+      "modprobe overlay",
+      "modprobe br_netfilter",
+      "printf 'net.bridge.bridge-nf-call-iptables = 1\nnet.ipv4.ip_forward = 1\nnet.bridge.bridge-nf-call-ip6tables = 1\n' > /etc/sysctl.d/99-kubernetes-cri.conf",
+      "sysctl --system",
       # INSTALL KUBEADM
       "apt install -y kubectl=${var.kubernetes_version}-00 kubelet=${var.kubernetes_version}-00 kubeadm=${var.kubernetes_version}-00 -f",
       # KUBEADM INIT THE CONTROL PLANE
@@ -133,64 +136,6 @@ provisioner "remote-exec" {
 
 }
 
-######################################
-#### CREATE ADMIN KUBECTL CONTEXT ####
-######################################
-
-resource "null_resource" "kubectl_configure" {
-
-# I use this pointless trigger to reference "self" on destroy...
-triggers = {
-    cluster_name = format("ktew-%s-%s", random_string.lower.result, var.dc_region)
-    admin_name = format("admin-ktew-%s-%s", random_string.lower.result, var.dc_region) 
-  }
-
-provisioner "local-exec" {
-    command = <<EOT
-      scp -q -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no root@${digitalocean_droplet.control_plane[0].ipv4_address}:/etc/kubernetes/admin.conf .;
-
-      # get API SERVER URL:PORT
-      export API_SERVER=$(kubectl --kubeconfig=admin.conf config view --raw -o json --minify | jq -r '.clusters[0].cluster."server"');
-
-      # get CA cert
-      kubectl --kubeconfig=admin.conf config view --raw -o json --minify | jq -r '.clusters[0].cluster."certificate-authority-data"' | tr -d '"' | base64 --decode > ca-file.crt;
-
-      # get client cert
-      kubectl --kubeconfig=admin.conf config view --raw -o json --minify | jq -r '.users[0].user."client-certificate-data"' | tr -d '"' | base64 --decode > client-data.crt;
-
-      # get client key
-      kubectl --kubeconfig=admin.conf config view --raw -o json --minify | jq -r '.users[0].user."client-key-data"' | tr -d '"' | base64 --decode > client-key.crt;
-
-      # build context
-      kubectl config set-cluster ${self.triggers.cluster_name} --server=$API_SERVER --certificate-authority=ca-file.crt --embed-certs=true;
-      kubectl config set-context ${self.triggers.cluster_name} --cluster=${self.triggers.cluster_name};
-      kubectl config set-credentials ${self.triggers.admin_name} --client-certificate=client-data.crt --client-key=client-key.crt --embed-certs=true;
-      kubectl config set-context ${self.triggers.cluster_name} --user=${self.triggers.admin_name};
-      kubectl config use-context ${self.triggers.cluster_name};
-
-      # clean up
-      rm -rf *.crt *.conf
-    EOT
-  }
-
-# clean up on destroy
-provisioner "local-exec" {
-  when    = destroy
-  command = <<EOT
-    # removes all LBs potentailly created by CCMs
-    kubectl delete --all svc --all-namespaces
-    kubectl config unset users.${self.triggers.admin_name};
-    kubectl config unset contexts.${self.triggers.cluster_name};
-    kubectl config unset clusters.${self.triggers.cluster_name}
-  EOT
-  }
-
-lifecycle {
-    ignore_changes = [triggers["cluster_name"],triggers["admin_name"]]
-  }
-
-}
-
 #############################
 #### CREATE WORKER NODES ####
 #############################
@@ -202,14 +147,14 @@ resource "digitalocean_droplet" "worker" {
   region             = var.dc_region
   size               = var.droplet_size
   private_networking = true
-  ssh_keys           = [digitalocean_ssh_key.default.fingerprint]
+  ssh_keys           = [digitalocean_ssh_key.terraform.id]
 
 
 connection {
   user        = "root"
   host        = self.ipv4_address
   type        = "ssh"
-  private_key = file(var.pvt_key)
+  private_key = var.pvt_key
   timeout     = "2m"
   agent       = false
   }
@@ -245,11 +190,14 @@ provisioner "remote-exec" {
       #"echo 'deb http://apt.kubernetes.io/ kubernetes-xenial main' | sudo tee -a /etc/apt/sources.list.d/kubernetes.list",
       # INSTALL DOCKER
       "curl -s https://download.docker.com/linux/ubuntu/gpg | apt-key add -",
-      "add-apt-repository 'deb [arch=amd64] https://download.docker.com/linux/ubuntu eoan stable'",
-      #"echo 'deb http://apt.kubernetes.io/ kubernetes-xenial main' | sudo tee -a /etc/apt/sources.list.d/kubernetes.list",
-      #"export VERSION=${var.docker_version} && curl -L https://get.docker.io | bash",
-      #"apt update && apt install -y docker.io=${var.docker_version}-0ubuntu1",
-      "apt install -y docker-ce=5:${var.docker_version}~3-0~ubuntu-eoan",
+      "add-apt-repository 'deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable'",
+      "apt install -y docker-ce=5:${var.docker_version}~3-0~ubuntu-focal",
+      # KUBEADM TWEAKS
+      "printf 'overlay\nbr_netfilter\n' > /etc/modules-load.d/containerd.conf",
+      "modprobe overlay",
+      "modprobe br_netfilter",
+      "printf 'net.bridge.bridge-nf-call-iptables = 1\nnet.ipv4.ip_forward = 1\nnet.bridge.bridge-nf-call-ip6tables = 1\n' > /etc/sysctl.d/99-kubernetes-cri.conf",
+      "sysctl --system",
       # INSTALL KUBEADM
       "apt install -y kubectl=${var.kubernetes_version}-00 kubelet=${var.kubernetes_version}-00 kubeadm=${var.kubernetes_version}-00 -f",
       # KUBEADM JOIN THE WORKER

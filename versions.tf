@@ -1,8 +1,11 @@
 terraform {
-  required_version = ">= 0.12"
+  required_version = ">= 0.14"
   required_providers {
-    digitalocean = { version = "~> 1.17" }
-    null = { version = "~> 2.1" }
-    random = { version = "~> 2.2" }
+    digitalocean = { 
+      source = "digitalocean/digitalocean"
+      version = "~> 2.6.0" 
+    }
+    null = { version = "~> 3.1" }
+    random = { version = "~> 3.1" }
   }
 }

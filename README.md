@@ -1,5 +1,7 @@
 # Kubernetes The Easy Way
 
+> WARNING: I'm updating this to work with TF Cloud. The biggest difference is using variables for SSH key data instead of using the "file()" function. Things might not be functional... 
+
 This tutorial walks you through setting up Kubernetes the easy way. This guide is for people looking to bootstrap a cluster not managed by a cloud provider.
 
 "not managed" means the control-plane is managed by you as opposed to a cloud provider. This gives you full control of the cluster's configuration (OIDC, FeatureGates, AuditLogs, etc).
@@ -18,10 +20,9 @@ The default configuration will create (3) 2CPUx2GB nodes ($15 a month or $0.0223
 
 ### Cluster details
 
-* [kubernetes](https://github.com/kubernetes/kubernetes) v1.18.4
-* [docker](https://github.com/docker/docker-ce) v19.03.11
-* [coredns](https://github.com/coredns/coredns) v1.6.7
-* [cilium cni](https://github.com/cilium/cilium) v1.8.0
+* [kubernetes](https://github.com/kubernetes/kubernetes) v1.20.5
+* [docker](https://github.com/docker/docker-ce) v20.10.5
+* [cilium cni](https://github.com/cilium/cilium) v1.9.5
 * [ubuntu](https://ubuntu.com/) 20.04 LTS
 
 ### Prerequisites
