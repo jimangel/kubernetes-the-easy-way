@@ -1,7 +1,5 @@
 # Kubernetes The Easy Way
 
-> WARNING: I'm updating this to work with TF Cloud. The biggest difference is using variables for SSH key data instead of using the "file()" function. Things might not be functional... 
-
 This tutorial walks you through setting up Kubernetes the easy way. This guide is for people looking to bootstrap a cluster not managed by a cloud provider.
 
 "not managed" means the control-plane is managed by you as opposed to a cloud provider. This gives you full control of the cluster's configuration (OIDC, FeatureGates, AuditLogs, etc).
@@ -16,7 +14,7 @@ Terraform is used to deploy and destroy a Kubernetes cluster on DigitalOcean via
 
 The default configuration will create (3) 2CPUx2GB nodes ($15 a month or $0.02232 an hour). I use it to spin up, test, and tear down. Total cost of ownership is $45 a month or $0.067 an hour. If I spun up a cluster and tested for 24 hours then destroyed it, it would cost $1.60 - pretty affordable!
 
-> Note: ONLY TESTED ON UBUNTU 18.04
+> Note: I've written and tested this code on Ubuntu 20.04, PRs are welcome if you'd like this to support other OSes!
 
 ### Cluster details
 
@@ -25,21 +23,11 @@ The default configuration will create (3) 2CPUx2GB nodes ($15 a month or $0.0223
 * [cilium cni](https://github.com/cilium/cilium) v1.9.5
 * [ubuntu](https://ubuntu.com/) 20.04 LTS
 
-### Prerequisites
-
-- Install [Terraform](https://learn.hashicorp.com/terraform/getting-started/install.html#install-terraform)
-
-- Export a [DigitalOcean Personal Access Token](https://www.digitalocean.com/docs/apis-clis/api/create-personal-access-token/) with **WRITE** access:
-
-    ```
-    export DO_PAT="<DIGITALOCEAN PERSONAL ACCESS TOKEN>"
-    ```
-
 ### Assumptions
 
 - kubectl is [installed](https://kubernetes.io/docs/tasks/tools/install-kubectl/) locally
 
-- You have a default [SSH key](https://www.digitalocean.com/community/tutorials/how-to-set-up-ssh-keys-on-ubuntu-1804):
+- You have a default [SSH key](https://www.digitalocean.com/community/tutorials/how-to-set-up-ssh-keys-on-ubuntu-1804) (for SSH access on the nodes):
 
     ```
     # check by running
@@ -58,11 +46,31 @@ The default configuration will create (3) 2CPUx2GB nodes ($15 a month or $0.0223
     # create
     ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa_ktew
     ssh-add ~/.ssh/id_rsa_ktew
-    
-    # use
-    export PUBLIC_KEY="~/.ssh/id_rsa_ktew.pub"
-    export PRIVATE_KEY="~/.ssh/id_rsa_ktew"
     ```
+
+### Prerequisites
+
+- Install [Terraform](https://learn.hashicorp.com/terraform/getting-started/install.html#install-terraform) (tested on v0.15.0)
+
+- Export a [DigitalOcean Personal Access Token](https://www.digitalocean.com/docs/apis-clis/api/create-personal-access-token/) with **WRITE** access:
+
+    ```
+    export DO_PAT="<DIGITALOCEAN PERSONAL ACCESS TOKEN>"
+    ```
+
+- Export your SSH public key:
+
+   ```
+   export TF_VAR_pub_key=$(cat ~/.ssh/id_rsa.pub)
+   ```
+
+- Export your SSH private key:
+
+   ```
+   export TF_VAR_pvt_key=$(cat ~/.ssh/id_rsa)
+   ```
+
+> I'm torn on exporting keys as variables, especially private keys. This is NOT good practice but it makes it easy to leverage tools like Terraform Cloud. If anyone knows of a solution to default to a file and secondary look for an env var, that would be ideal.
 
 ### Deploy Kubernetes
 
@@ -80,17 +88,24 @@ Build the cluster:
 ./create-cluster.sh
 ```
 
-It should take ~5 minutes to complete
+It should take ~10 minutes to complete
 
 ```
-real	4m24.201s
-user	0m6.580s
-sys	0m3.029s
+real	9m49.064s
+user	0m8.481s
+sys	0m1.243s
 ```
 
 Check it out!
 
 ```
+# copy the cluster-admin kubeconfig from the control plane node
+scp root@$(terraform output -json control_plane_ip | jq -r .[0]):/etc/kubernetes/admin.conf ${HOME}/admin.conf
+
+# export the kubeconfig
+export KUBECONFIG=${HOME}/admin.conf
+
+# run some commands!
 kubectl get nodes
 kubectl get pods -A
 ```

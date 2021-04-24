@@ -2,8 +2,8 @@
 
 # Set your SSH keys to import here
 # https://www.digitalocean.com/community/tutorials/how-to-set-up-ssh-keys-on-ubuntu-1804
-PUBLIC_KEY="${PUBLIC_KEY:-$HOME/.ssh/id_rsa.pub}"
-PRIVATE_KEY="${PRIVATE_KEY:-$HOME/.ssh/id_rsa}"
+#PUBLIC_KEY="${PUBLIC_KEY:-$HOME/.ssh/id_rsa.pub}"
+#PRIVATE_KEY="${PRIVATE_KEY:-$HOME/.ssh/id_rsa}"
 
 # error if DigitalOcean Access Token isn't set
 if [[ -z "${DO_PAT}" ]]; then
@@ -15,7 +15,8 @@ if [[ -z "${DO_PAT}" ]]; then
 fi
 
 # swap vars out
-terraform destroy --force -var "pub_key=${PUBLIC_KEY}" -var "pvt_key=$PRIVATE_KEY" -var "do_token=${DO_PAT}"
+terraform init
+terraform destroy -var "do_token=${DO_PAT}"
 
 # check the number of loadbalancers running
 LB_COUNT=$(curl -s -H "Authorization: Bearer $DO_PAT" "https://api.digitalocean.com/v2/load_balancers" |  jq -r .meta.total)
