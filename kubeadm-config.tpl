@@ -29,3 +29,7 @@ discovery:
     unsafeSkipCAVerification: true
   timeout: 5m0s
   tlsBootstrapToken: wi19h5.n18aqn376cwny601
+---
+kind: KubeletConfiguration
+apiVersion: kubelet.config.k8s.io/v1beta1
+cgroupDriver: cgroupfs

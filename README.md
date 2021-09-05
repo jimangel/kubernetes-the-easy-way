@@ -18,9 +18,9 @@ The default configuration will create (3) 2CPUx2GB nodes ($15 a month or $0.0223
 
 ### Cluster details
 
-* [kubernetes](https://github.com/kubernetes/kubernetes) v1.20.5
-* [docker](https://github.com/docker/docker-ce) v20.10.5
-* [cilium cni](https://github.com/cilium/cilium) v1.9.5
+* [kubernetes](https://github.com/kubernetes/kubernetes) v1.22.1
+* [docker](https://github.com/docker/docker-ce) v20.10.8
+* [cilium cni](https://github.com/cilium/cilium) v1.10.4
 * [ubuntu](https://ubuntu.com/) 20.04 LTS
 
 ### Assumptions
@@ -136,7 +136,7 @@ kubectl port-forward deployment/nginx 8080:80
 
 Run Cilium connectivity test
 ```
-kubectl apply -f https://raw.githubusercontent.com/cilium/cilium/v1.7.2/examples/kubernetes/connectivity-check/connectivity-check.yaml
+kubectl apply -f https://raw.githubusercontent.com/cilium/cilium/v1.10.4/examples/kubernetes/connectivity-check/connectivity-check.yaml
 ```
 
 Use cluster context

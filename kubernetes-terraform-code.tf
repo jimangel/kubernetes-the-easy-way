@@ -12,11 +12,14 @@
 ##################################
 
 # https://github.com/kubernetes/sig-release/blob/master/releases/patch-releases.md#timelines
-variable "kubernetes_version" { default = "1.20.5" }
-# https://github.com/docker/docker-ce/releases
-variable "docker_version" { default = "20.10.5" }
+variable "kubernetes_version" { default = "1.22.1" }
+# https://docs.docker.com/engine/release-notes/
+variable "docker_version" { default = "20.10.8" }
+# Note: Cilium no longer releases a deployment file and rely on helm now.
+# to generate:
+# helm template cilium cilium/cilium --version 1.10.4 --namespace kube-system > cilium-install.yaml
 # https://github.com/cilium/cilium/releases
-variable "clilium_version" { default = "1.9.5" }
+# variable "cilium_version" { default = "1.10.4" }
 variable "pod_subnet" { default = "10.217.0.0/16" }
 # https://www.digitalocean.com/docs/platform/availability-matrix/#datacenter-regions
 variable "dc_region" { default = "nyc3" }
@@ -127,10 +130,15 @@ provisioner "remote-exec" {
 #### INSTALL CNI ####
 #####################
 
+provisioner "file" {
+  source      = "cilium-install.yaml"
+  destination = "/tmp/cilium-install.yaml"
+}
+
 provisioner "remote-exec" {
   inline = [
-    # INSTALL CALICO CNI
-    "kubectl apply -f https://raw.githubusercontent.com/cilium/cilium/v${var.clilium_version}/install/kubernetes/quick-install.yaml"
+    # INSTALL CILIUM CNI
+    "kubectl apply -f /tmp/cilium-install.yaml"
     ]
   }
 
