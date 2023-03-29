@@ -1,10 +1,5 @@
 #!/bin/bash
 
-# Set your SSH keys to import here
-# https://www.digitalocean.com/community/tutorials/how-to-set-up-ssh-keys-on-ubuntu-1804
-#PUBLIC_KEY="${PUBLIC_KEY:-$HOME/.ssh/id_rsa.pub}"
-#PRIVATE_KEY="${PRIVATE_KEY:-$HOME/.ssh/id_rsa}"
-
 # error if DigitalOcean Access Token isn't set
 if [[ -z "${DO_PAT}" ]]; then
     printf "\n*******************************************************\n"

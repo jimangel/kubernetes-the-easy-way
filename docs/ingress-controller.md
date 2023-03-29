@@ -1,4 +1,5 @@
 Source: https://kubernetes.github.io/ingress-nginx/deploy/#using-helm
+Source: `helm show values ingress-nginx --repo https://kubernetes.github.io/ingress-nginx | yq`
 
 ### Pre-reqs
 
@@ -16,30 +17,32 @@ If configuring your domain for the first time, it might take up to 24 hours for 
 
 If still SSHed into the control plane, `exit` back to your terminal.
 
-1) Create `ingress-nginx` namespace
+While we do have the digitalocean CCM installed, that only provisions the LB. There are special annotations (https://github.com/digitalocean/digitalocean-cloud-controller-manager/blob/master/docs/controllers/services/annotations.md) that are supported for services. Including an example for [using digital ocean with ingress-nginx](https://github.com/kubernetes/ingress-nginx/blob/main/hack/manifest-templates/provider/do/values.yaml).
 
-    ```
-    kubectl create namespace ingress-nginx
-    ```
-
-Switch context to use namespace
-
-```
-kubectl config set-context --current --namespace=ingress-nginx
-```
-
-1) Add stable repo to helm
-
-    ```
-    helm repo add stable https://kubernetes-charts.storage.googleapis.com
-    ```
+The biggest takeaway is enabling the proxy-protocol AND enabling it via config (covered below). The rest would be workload dependant.
 
 1) Install ingress controllers using default TLS cert
 
     ```
-    helm upgrade -i nginx stable/nginx-ingress \
-    --namespace="ingress-nginx" \
-    --version="1.37.0"
+    helm upgrade --install ingress-nginx ingress-nginx \
+    --repo https://kubernetes.github.io/ingress-nginx \
+    --set controller.publishService.enabled=true \
+    --set controller.service.annotations."service\.beta\.kubernetes\.io/do-loadbalancer-enable-proxy-protocol"=true \
+    --set controller.config.use-proxy-protocol=true \
+    --set controller.ingressClassResource.name=nginx \
+    --set controller.ingressClassResource.name=nginx \
+    --set controller.extraArgs.enable-ssl-passthrough=true \
+    --namespace ingress-nginx --create-namespace
+    ```
+
+    > `controller.extraArgs.enable-ssl-passthrough` is used for https://kubernetes.github.io/ingress-nginx/user-guide/tls/#ssl-passthrough
+    
+    > `controller.ingressClassResource.name=nginx` is the default class name used in `spec.ingressClassName` but it's good to have the ability to change here too.
+    
+    Switch context to use namespace
+    
+    ```
+    kubectl config set-context --current --namespace=ingress-nginx
     ```
 
 ### Configure DNS
@@ -47,16 +50,9 @@ kubectl config set-context --current --namespace=ingress-nginx
 Wait for ingress service LoadBalancer `<pending>` EXTERNAL-IP to be generated.
 
 ```
-kubectl get service nginx-nginx-ingress-controller
+kubectl --namespace ingress-nginx get services -o wide -w ingress-nginx-controller
 NAME                                  TYPE           CLUSTER-IP       EXTERNAL-IP   PORT(S)                      AGE
 nginx-nginx-ingress-controller        LoadBalancer   10.97.183.148    <pending>     80:30511/TCP,443:31594/TCP   30s
-
-```
-
-```
-kubectl get service nginx-nginx-ingress-controller
-NAME                                  TYPE           CLUSTER-IP       EXTERNAL-IP     PORT(S)                      AGE
-nginx-nginx-ingress-controller        LoadBalancer   10.97.183.148    159.89.253.14   80:30511/TCP,443:31594/TCP   2m17s
 ```
 
 Create two DNS A records with the value of your IP.
@@ -90,27 +86,30 @@ Create a service (expose) the deployment
 kubectl expose deployment/nginx --port 80
 ```
 
-Create an ingress object to accept external traffic. Using the `force-ssl-redirect` annotation will force HTTPS traffic using our cert.
+Create an ingress object to accept external traffic.
 
 ```
 # replace example.com with your domain
 export DOMAIN="example.com"
 
 cat <<EOF | kubectl apply -f -
-apiVersion: networking.k8s.io/v1beta1
+apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  annotations:
   name: test
 spec:
+  ingressClassName: nginx
   rules:
-    - host: test.${DOMAIN}
-      http:
-        paths:
-          - backend:
-              serviceName: nginx
-              servicePort: 80
-            path: /
+  - host: test.${DOMAIN}
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: nginx
+            port:
+              number: 80
 EOF
 ```
 
@@ -118,7 +117,7 @@ Visit URL (test.example.com) in a web browser.
 
 ### Clean up
 
-Set namespace context
+Ensure namespace context
 
 ```
 kubectl config set-context --current --namespace=default
@@ -132,8 +131,8 @@ kubectl delete service nginx
 kubectl delete ingress test
 ```
 
-Delete the ingress controllers
+(optionally) Delete the ingress controllers
 
 ```
-helm delete nginx -n ingress-nginx
+helm delete ingress-nginx --namespace ingress-nginx
 ```

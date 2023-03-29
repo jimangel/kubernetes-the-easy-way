@@ -8,27 +8,36 @@
 # block storage
 
 ##################################
-#### SET VARIABLES & VERISONS ####
+#### SET VARIABLES & VERSIONS ####
 ##################################
 
 # https://github.com/kubernetes/sig-release/blob/master/releases/patch-releases.md#timelines
-variable "kubernetes_version" { default = "1.22.1" }
-# https://docs.docker.com/engine/release-notes/
-variable "docker_version" { default = "20.10.8" }
+variable "kubernetes_version" { default = "1.26.3" }
+
 # Note: Cilium no longer releases a deployment file and rely on helm now.
 # to generate:
-# helm template cilium cilium/cilium --version 1.10.4 --namespace kube-system > cilium-install.yaml
+# helm repo add cilium https://helm.cilium.io/ && helm repo update
+# helm template cilium cilium/cilium --version 1.13.1 --namespace kube-system > cilium-install.yaml
 # https://github.com/cilium/cilium/releases
-# variable "cilium_version" { default = "1.10.4" }
+
 variable "pod_subnet" { default = "10.217.0.0/16" }
+
 # https://www.digitalocean.com/docs/platform/availability-matrix/#datacenter-regions
 variable "dc_region" { default = "nyc3" }
-# https://developers.digitalocean.com/documentation/v2/#list-all-sizes
+
+# https://docs.digitalocean.com/reference/api/api-reference/#operation/sizes_list
+# curl -X GET -H "Authorization: Bearer $DO_PAT" "https://api.digitalocean.com/v2/sizes" | jq | grep cpu
 # setting below 2 CPUs will fail kubeadm, ignore with `--ignore-preflight-errors=all`
 variable "droplet_size" { default = "s-2vcpu-2gb" }
+
+# set image
+# curl -X GET --silent "https://api.digitalocean.com/v2/images?per_page=999" -H "Authorization: Bearer $DO_PAT" | jq | grep ubuntu  
+variable "do_image" { default = "ubuntu-22-04-x64"}
+
 # set with `export DO_PAT=<API TOKEN>`
 variable "do_token" {}
-# set in `*-cluster.sh` scripts
+
+# used for SSH access to nodes (pub on created, pvt for config)
 variable "pub_key" {}
 variable "pvt_key" {}
 
@@ -46,7 +55,7 @@ resource "random_string" "lower" {
   length  = 6
   upper   = false
   lower   = true
-  number  = true
+  numeric  = true
   special = false
 }
 
@@ -55,70 +64,93 @@ resource "random_string" "lower" {
 ######################################
 
 # Use SSH key
-resource "digitalocean_ssh_key" "terraform" {
-  name       = "terraform-tf-cloud"
-  public_key = var.pub_key
-}
+#resource "digitalocean_ssh_key" "terraform" {
+#  name       = "terraform-kube-easy"
+#  public_key = file(var.pub_key)
+#}
 
 resource "digitalocean_droplet" "control_plane" {
   count              = 1
-  image              = "ubuntu-20-04-x64"
+  image              = var.do_image
   name               = format("control-plane-%s-%v", var.dc_region, count.index + 1)
   region             = var.dc_region
   size               = var.droplet_size
-  private_networking = true
-  ssh_keys           = [digitalocean_ssh_key.terraform.id]
+  user_data          = <<EOF
+#cloud-config
+chpasswd:
+  list: |
+    root:randomdumbdisabledstring
+  expire: false
+users:
+  - name: root
+    ssh-authorized-keys:
+      - "${file("${var.pub_key}")}"
+EOF
 
-connection {
-    user        = "root"
-    host        = self.ipv4_address
-    type        = "ssh"
-    private_key = var.pvt_key
-    timeout     = "2m"
-    agent       = false
+  connection {
+    user           = "root"
+    host           = self.ipv4_address
+    type           = "ssh"
+    agent          = false
+    agent_identity = var.pub_key
+    private_key    = "${file("${var.pvt_key}")}"
+    timeout        = "15m"
   }
 
-###############################
-#### RENDER KUBEADM CONFIG ####
-###############################
-
-provisioner "file" {
-    content = templatefile("${path.module}/kubeadm-config.tpl", 
-    {
-      cluster_name = format("ktew-%s", var.dc_region),
-      kubernetes_version = var.kubernetes_version,
-      pod_subnet = var.pod_subnet,
-      control_plane_ip = digitalocean_droplet.control_plane[0].ipv4_address 
-    })
-    destination = "/tmp/kubeadm-config.yaml"
+  ###############################################
+  ### RENDER KUBEADM CONFIG TO CONTROL PLANE ####
+  ###############################################
+  provisioner "file" {
+      content = templatefile("${path.module}/kubeadm-config.tpl", 
+      {
+        cluster_name = format("ktew-%s", var.dc_region),
+        kubernetes_version = var.kubernetes_version,
+        pod_subnet = var.pod_subnet,
+        control_plane_ip = digitalocean_droplet.control_plane[0].ipv4_address 
+      })
+      destination = "/tmp/kubeadm-config.yaml"
   }
+  
+  ###################################################
+  #### INSTALL CONTROL PLANE DOCKER / KUBERNETES ####
+  ###################################################
+  
+  # https://kubernetes.io/docs/setup/production-environment/container-runtimes/#install-and-configure-prerequisites
+  # helpful for debugging containerd: `crictl --debug version`
+  # more: `ctr plugin list | grep cri`
 
-###################################################
-#### INSTALL CONTROL PLANE DOCKER / KUBERNETES ####
-###################################################
-
-provisioner "remote-exec" {
+  provisioner "remote-exec" {
     inline = [
       # GENERAL REPO SPEEDUP
       "until [ -f /var/lib/cloud/instance/boot-finished ]; do sleep 1; done",
       "echo '' > /etc/apt/sources.list",
-      "add-apt-repository 'deb [arch=amd64] http://mirrors.digitalocean.com/ubuntu/ focal main restricted universe'",
+      "add-apt-repository -y 'deb http://mirrors.digitalocean.com/ubuntu/ jammy main restricted universe'",
       # ADD KUBERNETES REPO
-      "curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -",
-      "add-apt-repository 'deb http://apt.kubernetes.io/ kubernetes-xenial main'",
-      #"echo 'deb http://apt.kubernetes.io/ kubernetes-xenial main' | sudo tee -a /etc/apt/sources.list.d/kubernetes.list",
-      # INSTALL DOCKER
-      "curl -s https://download.docker.com/linux/ubuntu/gpg | apt-key add -",
-      "add-apt-repository 'deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable'",
-      "apt install -y docker-ce=5:${var.docker_version}~3-0~ubuntu-focal",
+      "curl -fsSLo /etc/apt/keyrings/kubernetes-archive-keyring.gpg https://packages.cloud.google.com/apt/doc/apt-key.gpg",
+      "echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-archive-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main' | sudo tee /etc/apt/sources.list.d/kubernetes.list",
+      # INSTALL containerd
+      "curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg",
+      "echo 'deb [signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu jammy stable' | sudo tee /etc/apt/sources.list.d/docker.list",
+      "apt update && apt install containerd.io -y",
+      "containerd config default > /etc/containerd/config.toml",
+      "sed -i 's~SystemdCgroup = false~SystemdCgroup = true~g' /etc/containerd/config.toml",
+      "systemctl enable containerd",
+      # fix crictl (avoids deprecated failure error around dockershim)
+      "printf 'runtime-endpoint: unix:///run/containerd/containerd.sock' > /etc/crictl.yaml",
+      # containerd CNI
+      "curl -Lo 'cni-plugins-linux.tgz' https://github.com/containernetworking/plugins/releases/download/v1.2.0/cni-plugins-linux-amd64-v1.2.0.tgz",
+      "mkdir -p /opt/cni/bin",
+      "tar Cxzvf /opt/cni/bin cni-plugins-linux.tgz",
+      "systemctl restart containerd",
       # KUBEADM TWEAKS
-      "printf 'overlay\nbr_netfilter\n' > /etc/modules-load.d/containerd.conf",
+      "printf 'overlay\nbr_netfilter\n' > /etc/modules-load.d/k8s.conf",
       "modprobe overlay",
       "modprobe br_netfilter",
-      "printf 'net.bridge.bridge-nf-call-iptables = 1\nnet.ipv4.ip_forward = 1\nnet.bridge.bridge-nf-call-ip6tables = 1\n' > /etc/sysctl.d/99-kubernetes-cri.conf",
+      "printf 'net.bridge.bridge-nf-call-iptables = 1\nnet.ipv4.ip_forward = 1\nnet.bridge.bridge-nf-call-ip6tables = 1\n' > /etc/sysctl.d/k8s.conf",
       "sysctl --system",
       # INSTALL KUBEADM
       "apt install -y kubectl=${var.kubernetes_version}-00 kubelet=${var.kubernetes_version}-00 kubeadm=${var.kubernetes_version}-00 -f",
+      # apt install -y kubectl=1.26.3-00 kubelet=1.26.3-00 kubeadm=1.26.3-00 -f
       # KUBEADM INIT THE CONTROL PLANE
       "kubeadm init --config=/tmp/kubeadm-config.yaml",
       # SETUP KUBECTL REMOTELY
@@ -126,93 +158,107 @@ provisioner "remote-exec" {
     ]
   }
 
-#####################
-#### INSTALL CNI ####
-#####################
-
-provisioner "file" {
-  source      = "cilium-install.yaml"
-  destination = "/tmp/cilium-install.yaml"
-}
-
-provisioner "remote-exec" {
-  inline = [
-    # INSTALL CILIUM CNI
-    "kubectl apply -f /tmp/cilium-install.yaml"
-    ]
+  #####################
+  #### INSTALL CNI ####
+  #####################
+  provisioner "file" {
+    source      = "cilium-install.yaml"
+    destination = "/tmp/cilium-install.yaml"
   }
-
+  
+  provisioner "remote-exec" {
+    inline = [
+      # INSTALL CILIUM CNI
+      "kubectl apply -f /tmp/cilium-install.yaml"
+      ]
+    }
 }
 
 #############################
 #### CREATE WORKER NODES ####
 #############################
-
 resource "digitalocean_droplet" "worker" {
   count              = 2
-  image              = "ubuntu-20-04-x64"
+  image              = var.do_image
   name               = format("worker-%s-%v", var.dc_region, count.index + 1)
   region             = var.dc_region
   size               = var.droplet_size
-  private_networking = true
-  ssh_keys           = [digitalocean_ssh_key.terraform.id]
+  user_data          = <<EOF
+#cloud-config
+chpasswd:
+  list: |
+    root:randomdumbdisabledstring
+  expire: false
+users:
+  - name: root
+    ssh-authorized-keys:
+      - "${file("${var.pub_key}")}"
+EOF
 
-
-connection {
-  user        = "root"
-  host        = self.ipv4_address
-  type        = "ssh"
-  private_key = var.pvt_key
-  timeout     = "2m"
-  agent       = false
+  connection {
+    user           = "root"
+    host           = self.ipv4_address
+    type           = "ssh"
+    agent          = false
+    agent_identity = var.pub_key
+    private_key    = "${file("${var.pvt_key}")}"
+    timeout        = "15m"
   }
 
-###############################
-#### RENDER KUBEADM CONFIG ####
-############################### 
-
-provisioner "file" {
-  content = templatefile("${path.module}/kubeadm-config.tpl", 
-    {
-      cluster_name = format("ktew-%s", var.dc_region),
-      kubernetes_version = var.kubernetes_version,
-      pod_subnet = var.pod_subnet,
-      control_plane_ip = digitalocean_droplet.control_plane[0].ipv4_address 
-    })
-    destination = "/tmp/kubeadm-config.yaml"
-  }
-
-############################################
-#### INSTALL WORKER DOCKER / KUBERNETES ####
-############################################
-
-provisioner "remote-exec" {
-  inline = [
-      # GENERAL REPO SPEEDUP
-      "until [ -f /var/lib/cloud/instance/boot-finished ]; do sleep 1; done",
-      "echo '' > /etc/apt/sources.list",
-      "add-apt-repository 'deb [arch=amd64] http://mirrors.digitalocean.com/ubuntu/ focal main restricted universe'",
-      # ADD KUBERNETES REPO
-      "curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -",
-      "add-apt-repository 'deb http://apt.kubernetes.io/ kubernetes-xenial main'",
-      #"echo 'deb http://apt.kubernetes.io/ kubernetes-xenial main' | sudo tee -a /etc/apt/sources.list.d/kubernetes.list",
-      # INSTALL DOCKER
-      "curl -s https://download.docker.com/linux/ubuntu/gpg | apt-key add -",
-      "add-apt-repository 'deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable'",
-      "apt install -y docker-ce=5:${var.docker_version}~3-0~ubuntu-focal",
-      # KUBEADM TWEAKS
-      "printf 'overlay\nbr_netfilter\n' > /etc/modules-load.d/containerd.conf",
-      "modprobe overlay",
-      "modprobe br_netfilter",
-      "printf 'net.bridge.bridge-nf-call-iptables = 1\nnet.ipv4.ip_forward = 1\nnet.bridge.bridge-nf-call-ip6tables = 1\n' > /etc/sysctl.d/99-kubernetes-cri.conf",
-      "sysctl --system",
-      # INSTALL KUBEADM
-      "apt install -y kubectl=${var.kubernetes_version}-00 kubelet=${var.kubernetes_version}-00 kubeadm=${var.kubernetes_version}-00 -f",
-      # KUBEADM JOIN THE WORKER
-      "kubeadm join --config=/tmp/kubeadm-config.yaml"
+  ###############################################
+  #### RENDER KUBEADM CONFIG TO WORKER NODES ####
+  ###############################################
+  provisioner "file" {
+    content = templatefile("${path.module}/kubeadm-config.tpl", 
+      {
+        cluster_name = format("ktew-%s", var.dc_region),
+        kubernetes_version = var.kubernetes_version,
+        pod_subnet = var.pod_subnet,
+        control_plane_ip = digitalocean_droplet.control_plane[0].ipv4_address 
+      })
+      destination = "/tmp/kubeadm-config.yaml"
+    }
+  
+  ############################################
+  #### INSTALL WORKER DOCKER / KUBERNETES ####
+  ############################################
+  provisioner "remote-exec" {
+    inline = [
+        # GENERAL REPO SPEEDUP
+        "until [ -f /var/lib/cloud/instance/boot-finished ]; do sleep 1; done",
+        "echo '' > /etc/apt/sources.list",
+        "add-apt-repository -y 'deb http://mirrors.digitalocean.com/ubuntu/ jammy main restricted universe'",
+        # ADD KUBERNETES REPO
+        "curl -fsSLo /etc/apt/keyrings/kubernetes-archive-keyring.gpg https://packages.cloud.google.com/apt/doc/apt-key.gpg",
+        "echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-archive-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main' | sudo tee /etc/apt/sources.list.d/kubernetes.list",
+        # INSTALL containerd
+        "curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg",
+        "echo 'deb [signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu jammy stable' | sudo tee /etc/apt/sources.list.d/docker.list",
+        "apt update && apt install containerd.io -y",
+        "containerd config default > /etc/containerd/config.toml",
+        "sed -i 's~SystemdCgroup = false~SystemdCgroup = true~g' /etc/containerd/config.toml",
+        "systemctl enable containerd",
+        # fix crictl (avoids deprecated failure error around dockershim)
+        "printf 'runtime-endpoint: unix:///run/containerd/containerd.sock' > /etc/crictl.yaml",
+        # containerd CNI
+        "curl -Lo 'cni-plugins-linux.tgz' https://github.com/containernetworking/plugins/releases/download/v1.2.0/cni-plugins-linux-amd64-v1.2.0.tgz",
+        "mkdir -p /opt/cni/bin",
+        "tar Cxzvf /opt/cni/bin cni-plugins-linux.tgz",
+        "systemctl restart containerd",
+        # KUBEADM TWEAKS
+        "printf 'overlay\nbr_netfilter\n' > /etc/modules-load.d/containerd.conf",
+        "modprobe overlay",
+        "modprobe br_netfilter",
+        "printf 'net.bridge.bridge-nf-call-iptables = 1\nnet.ipv4.ip_forward = 1\nnet.bridge.bridge-nf-call-ip6tables = 1\n' > /etc/sysctl.d/99-kubernetes-cri.conf",
+        "sysctl --system",
+        # INSTALL KUBEADM
+        "apt install -y kubectl=${var.kubernetes_version}-00 kubelet=${var.kubernetes_version}-00 kubeadm=${var.kubernetes_version}-00 -f",
+        # KUBEADM JOIN THE WORKER
+        "kubeadm join --config=/tmp/kubeadm-config.yaml"
     ]
   }
 }
+
 
 ##########################
 #### OUTPUT VARIABLES ####

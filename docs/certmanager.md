@@ -3,25 +3,11 @@ Source: https://cert-manager.io/docs/installation/kubernetes/
 ### Pre-reqs
 
 - Helm v3 [installed](https://helm.sh/docs/intro/install/)
-- A domain with DNS managed by DigitalOcean
+- A domain with [DNS managed by DigitalOcean](https://docs.digitalocean.com/products/networking/dns/quickstart/) or https://cloud.digitalocean.com/networking/domains
 
 **Note:** There are no charges for DNS management in DigitalOcean.
 
 If configuring your domain for the first time, it might take up to 24 hours for DNS propagate.
-
-....
-
-### Create  `cert-manager` namespace
-
-```
-kubectl create namespace cert-manager
-```
-
-Switch context to use namespace
-
-```
-kubectl config set-context --current --namespace=cert-manager
-```
 
 ### Install certmanager using helm
 
@@ -32,22 +18,26 @@ helm repo update
 helm upgrade -i \
 cert-manager jetstack/cert-manager \
 --namespace cert-manager \
---version v0.15.0 \
---set installCRDs=true
+--create-namespace \
+--version v1.11.0 \
+--set installCRDs=true \
+
 ```
 
-### Test setup (optional)
-
-https://cert-manager.io/docs/installation/kubernetes/#verifying-the-installation
+> https://cert-manager.io/docs/installation/kubernetes/#verifying-the-installation
 
 ### Setup ACME LetsEncrypt issuer via DigitalOcean
+
+Switch context to use namespace
+
+```
+kubectl config set-context --current --namespace=cert-manager
+```
 
 Export your unique variables needed
 
 ```
-export DO_PAT=DO TOKEN
-export EMAIL=<email address>
-export DOMAIN="example.com"
+export EMAIL="emailaddress@example.com"
 ```
 
 ```
@@ -64,7 +54,7 @@ EOF
 
 ```
 cat <<EOF | kubectl apply -f -
-apiVersion: cert-manager.io/v1alpha2
+apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
   name: digitalocean-issuer-prod
@@ -92,7 +82,7 @@ kubectl describe clusterissuer digitalocean-issuer-prod
 
 ### Test with a dummy nginx container
 
-Set namespace context
+Set namespace context back to `default`
 
 ```
 kubectl config set-context --current --namespace=default
@@ -110,6 +100,8 @@ Create a service (expose) the deployment
 kubectl expose deployment/nginx --port 80
 ```
 
+> Note: This exposes the container port, NOT the external "traffic" accepting port. That is defined in the following ingress section.
+
 Create an ingress object to accept external traffic. Using the `force-ssl-redirect` annotation will force HTTPS traffic using our cert.
 
 ```
@@ -117,35 +109,50 @@ Create an ingress object to accept external traffic. Using the `force-ssl-redire
 export DOMAIN="example.com"
 
 cat <<EOF | kubectl apply -f -
-apiVersion: networking.k8s.io/v1beta1
+apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
+  name: test
   annotations:
     cert-manager.io/cluster-issuer: digitalocean-issuer-prod
-  name: test
 spec:
-  rules:
-    - host: test.${DOMAIN}
-      http:
-        paths:
-          - backend:
-              serviceName: nginx
-              servicePort: 80
-            path: /
-  tls: # < placing a host in the TLS config will indicate a certificate should be created
+  ingressClassName: nginx
+  tls:                           # placing a host in the TLS config will indicate a certificate should be created
   - hosts:
-    - test.${DOMAIN}
-    secretName: myingress-cert # < cert-manager will store the created certificate in this secret.
+      - test.${DOMAIN}
+    secretName: myingress-cert   # cert-manager will store the created certificate in this secret.
+  rules:
+  - host: test.${DOMAIN}
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: nginx
+            port:
+              number: 80
 EOF
 ```
 
-Wait for certificate to be issued by monitoring `kubectl get orders`. Once STATE is `valid` visit URL in a web browser.
+Wait for certificate to be issued by monitoring `kubectl get orders --watch`. Once STATE is `valid` visit URL (test.example.com) in a web browser.
 
 ![](img/ssl-test.png)
 
+### Install CSI Driver for pod-level TLS (optional)
+
+```
+helm repo add jetstack https://charts.jetstack.io --force-update
+helm upgrade -i -n cert-manager cert-manager-csi-driver jetstack/cert-manager-csi-driver --wait
+```
+
+### Up next
+
+Let's [add an OIDC provider](setup-dex-oidc.md) for authentication.
+
 ### Clean up
 
-Set namespace context
+Ensure `default` namespace context
 
 ```
 kubectl config set-context --current --namespace=default
@@ -157,4 +164,13 @@ Delete the nginx test deployment
 kubectl delete deployment nginx
 kubectl delete service nginx
 kubectl delete ingress test
+```
+
+Delete cert manager:
+
+```
+helm delete cert-manager --namespace cert-manager
+
+# optional removal CSI driver
+helm delete cert-manager-csi-driver --namespace cert-manager
 ```

@@ -2,6 +2,11 @@
 *.conf
 *.crt
 
+# Ignore env files
+.env
+.envrc
+
+
 # Local .terraform directories
 **/.terraform/*
 .terraform.lock.hcl

@@ -14,17 +14,23 @@ Prometheus Operator allows you to create a monitoring stack for your cluster con
 
 We will use gmail as the alerting method of choice. That means we need to provide our email and password. For security sake, you shouldn't use your main Gmail password. Instead generate an [app password](https://support.google.com/accounts/answer/185833).
 
+Direct link to create: https://myaccount.google.com/apppasswords
+
+- Select app: Mail
+- Select device: Other (custom name)
+- Name: prometheus > Generate
+
 Once that's done, run the following in a shell, substituting in your Gmail address and app password: 
 
 ```
-GMAIL_ACCOUNT=email@example.com      # Substitute in your full gmail address here.
-GMAIL_AUTH_TOKEN=################        # Substitute in your app password
+export GMAIL_ACCOUNT="email@example.com"      # Substitute in your full gmail address here.
+export GMAIL_AUTH_TOKEN="################"       # Substitute in your app password
 ```
 
 This tutorial assumes you already have the `DOMAIN` variable set:
 
 ```
-DOMAIN=example.com
+export DOMAIN="example.com"
 ```
 
 ### Create the namespace and change context
@@ -37,47 +43,58 @@ kubectl config set-context --current --namespace=monitoring
 ### Add and update helm
 
 ```
-helm repo add stable https://kubernetes-charts.storage.googleapis.com
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 helm repo update
 ```
 
 ### Deploy the prometheus operator via helm
 
-There's a LOT of flags set here. I highly recomend reviewing all options at https://github.com/helm/charts/tree/master/stable/prometheus-operator#configuration
+There's a LOT of flags set here. I highly recommend reviewing all options `helm show values prometheus-community/kube-prometheus-stack`
 
 A couple key items that you may want to be aware of:
 - Create no rules with `--set defaultRules.create=false` which is great for supplying custom rules after deploying.
-  - Default rules are found [here](https://github.com/helm/charts/tree/master/stable/prometheus-operator/templates/prometheus/rules)
+  - Default rules are found [here](https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack/templates/prometheus/rules-1.14)
 - Change Grafana's password with `--set grafana.adminPassword="YOUR-PASSWORD"`
 - Change the runbook URL with `--set defaultRules.runbookUrl` defaults to https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#
 - `--set kubeProxy.enabled=false` will prevent a service and serviceMonitor from scraping the Kubernetes proxy
 - `--set kubeEtcd.enabled=false` will prevent etcd from being scraped
 - `--set defaultRules.appNamespacesTarget="kube-system|monitoring|<other-namespace>"` to only alert on specific namespaces.
+- `--version` is the CHART version, not the APP version ([source](https://github.com/prometheus-community/helm-charts/blob/main/charts/kube-prometheus-stack/Chart.yaml#L24))
 
-Be aware that, by default, alertmanager and prometheus GUI's are exposed with no log in. If that is a concern, you may consider removing the `.ingress.enabled=` values and only access via `kubectl proxy`.
+Be aware that, by default, Alertmanager and Prometheus GUI's are exposed with no log in. If that is a concern, you may consider removing the `ingress.enabled=` values and only access the UI via `kubectl proxy`.
 
 ```
-helm upgrade -i prometheus-operator stable/prometheus-operator \
+# TIPS:
+# helm show values prometheus-community/kube-prometheus-stack | yq
+# use `noglob` on mac: https://stackoverflow.com/questions/63327027/slice-in-helm-no-matches-found
+
+noglob helm upgrade -i prometheus-app prometheus-community/kube-prometheus-stack \
 --namespace monitoring \
---version 8.13.12 \
+--create-namespace \
+--version "45.8.0" \
 --set prometheus.ingress.enabled=true \
+--set kubeProxy.enabled=false \
+--set kubeEtcd.enabled=false \
+--set prometheus.ingress.ingressClassName=nginx \
 --set prometheus.ingress.hosts[0]="prometheus.${DOMAIN}" \
 --set prometheus.ingress.annotations."cert-manager\.io/cluster-issuer"="digitalocean-issuer-prod" \
 --set prometheus.ingress.tls[0].hosts[0]="prometheus.${DOMAIN}" \
 --set prometheus.ingress.tls[0].secretName="prometheus-secret" \
---set grafana.adminPassword="H4Rd2Gu3ss!" \
+--set grafana.adminPassword='H4Rd2Gu3ss!' \
 --set grafana.ingress.enabled=true \
+--set grafana.ingress.ingressClassName=nginx \
 --set grafana.ingress.hosts[0]="grafana.${DOMAIN}" \
 --set grafana.ingress.annotations."cert-manager\.io/cluster-issuer"="digitalocean-issuer-prod" \
 --set grafana.ingress.tls[0].hosts[0]="grafana.${DOMAIN}" \
 --set grafana.ingress.tls[0].secretName="grafana-secret" \
 --set alertmanager.ingress.enabled=true \
+--set alertmanager.ingress.ingressClassName=nginx \
 --set alertmanager.alertmanagerSpec.externalUrl="https://alertmanager.${DOMAIN}" \
 --set alertmanager.ingress.hosts[0]="alertmanager.${DOMAIN}" \
 --set alertmanager.ingress.annotations."cert-manager\.io/cluster-issuer"="digitalocean-issuer-prod" \
 --set alertmanager.ingress.tls[0].hosts[0]="alertmanager.${DOMAIN}" \
 --set alertmanager.ingress.tls[0].secretName="alertmanager-secret" \
--f - <<EOF 
+-f - <<EOF
 alertmanager:
   config:
     global:
@@ -103,11 +120,6 @@ alertmanager:
         auth_identity: "$GMAIL_ACCOUNT"
         auth_password: "$GMAIL_AUTH_TOKEN"
 EOF
-
-# without cert-manager remove the following:
---set prometheus.ingress.annotations."cert-manager\.io/cluster-issuer"="digitalocean-issuer-prod" \
---set prometheus.ingress.tls[0].hosts[0]="prometheus.${DOMAIN}" \
---set prometheus.ingress.tls[0].secretName="prometheus-secret" \
 ```
 
 ### Check it out!
@@ -115,7 +127,13 @@ EOF
 Once deployed you should be able to visit any of the following URLs:
 - prometheus.example.com
 - alertmanager.example.com
-- grafana.example.com
+- grafana.example.com (user: admin password: H4Rd2Gu3ss!)
+
+![](./img/grafana.png)
+
+You can also check that all targets are up: https://prometheus.YOUR_URL_DOT_COM/targets
+
+> Note: I use a `kubeadm` config template [here](../kubeadm-config.tpl) that specifies components bind to `0.0.0.0` vs. `localhost` for scraping. If you find some targets are down, this issue might help: https://github.com/prometheus-community/helm-charts/issues/204#issuecomment-788065305
 
 ### Configure alertmanager beyond the default HTML email
 
@@ -193,16 +211,58 @@ kubectl -n monitoring create configmap alert-template --from-file=/tmp/custom.tm
 
 #### Update the helm CLI values
 
-append the helm value to use the ConfigMap
+Append the helm value to use the ConfigMap
 
 ```
---set alertmanager.alertmanagerSpec.configMaps="alert-template" \
+--set alertmanager.alertmanagerSpec.configMaps[0]="alert-template" \
 ```
 
- and update alertmanager config
+And update alertmanager config to use a template:
 
 ```
--f - <<EOF 
+...
+    receivers:
+      email_configs:
+        ...
+        html: '{{ template "email.custom.html" . }}'
+        headers:
+          subject: '{{ template "__subject" . }}'
+    templates:
+    - '/etc/alertmanager/configmaps/alert-template/*.tmpl'  
+...
+```
+
+Re-run the ENTIRE helm command again with the new changes:
+
+```
+noglob helm upgrade -i prometheus-app prometheus-community/kube-prometheus-stack \
+--namespace monitoring \
+--create-namespace \
+--version "45.8.0" \
+--set prometheus.ingress.enabled=true \
+--set kubeProxy.enabled=false \
+--set kubeEtcd.enabled=false \
+--set prometheus.ingress.ingressClassName=nginx \
+--set prometheus.ingress.hosts[0]="prometheus.${DOMAIN}" \
+--set prometheus.ingress.annotations."cert-manager\.io/cluster-issuer"="digitalocean-issuer-prod" \
+--set prometheus.ingress.tls[0].hosts[0]="prometheus.${DOMAIN}" \
+--set prometheus.ingress.tls[0].secretName="prometheus-secret" \
+--set grafana.adminPassword='H4Rd2Gu3ss!' \
+--set grafana.ingress.enabled=true \
+--set grafana.ingress.ingressClassName=nginx \
+--set grafana.ingress.hosts[0]="grafana.${DOMAIN}" \
+--set grafana.ingress.annotations."cert-manager\.io/cluster-issuer"="digitalocean-issuer-prod" \
+--set grafana.ingress.tls[0].hosts[0]="grafana.${DOMAIN}" \
+--set grafana.ingress.tls[0].secretName="grafana-secret" \
+--set alertmanager.ingress.enabled=true \
+--set alertmanager.ingress.ingressClassName=nginx \
+--set alertmanager.alertmanagerSpec.externalUrl="https://alertmanager.${DOMAIN}" \
+--set alertmanager.alertmanagerSpec.configMaps[0]="alert-template" \
+--set alertmanager.ingress.hosts[0]="alertmanager.${DOMAIN}" \
+--set alertmanager.ingress.annotations."cert-manager\.io/cluster-issuer"="digitalocean-issuer-prod" \
+--set alertmanager.ingress.tls[0].hosts[0]="alertmanager.${DOMAIN}" \
+--set alertmanager.ingress.tls[0].secretName="alertmanager-secret" \
+-f - <<EOF
 alertmanager:
   config:
     global:
@@ -237,28 +297,20 @@ EOF
 
 ### Test alerting
 
-If have at least two workers, the easiest test is to log into a worker node and stop docker & kubelet
+**TODO:** I need to create a better test. I originally killed a node to test, which worked. However, most recently I did the same test and destroyed the node that was running many of the alerting components. One option would be to remove the "'- match' route directing alerts to the 'null' receiver" for Watchdog alerts (that always fire).
 
 ```
-ssh root@$(terraform output -json worker_ip | jq -r .[0])
-service docker stop
-service kubelet stop
-exit
+# delete this and reapply
+      routes:
+      - match:
+          alertname: Watchdog
+        receiver: 'null'
 ```
-
-Then delete all pods running on that worker node (replacing `<NODE_NAME>`)
-
-```
-for i in $(kubectl get pods -o wide | grep <NODE_NAME> | awk 'NR>1 {print $1}'); do kubectl delete pod $i --grace-period=0 --force; done
-```
-
-Wait 10-15 minutes for the alerts to begin triggering.
 
 ### Cleanup
 
 ```
-kubectl config set-context --current --namespace=monitoring
-helm delete prometheus-operator
+helm delete prometheus-app --namespace "monitoring"
 ```
 
-> Note: If you created an GMAIL_AUTH_TOKEN and don't plan on using it again, it would be best to delete it entirely.
+> Note: If you created an GMAIL_AUTH_TOKEN and don't plan on using it again, it would be best to delete it entirely. https://myaccount.google.com/apppasswords
