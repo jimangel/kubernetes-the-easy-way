@@ -60,7 +60,7 @@ To update the API server, modify the static manifest (`/etc/kubernetes/manifests
 
 ```
 # ssh into the control plane node
-ssh root@$(terraform output -json control_plane_ip | jq -r '.[]')
+ssh kubernetes@$(terraform output -json control_plane_ip | jq -r '.[]')
 
 # copy the letsencrypt cert stack to the node
 curl https://letsencrypt.org/certs/isrgrootx1.pem.txt > isrgrootx1.pem.txt

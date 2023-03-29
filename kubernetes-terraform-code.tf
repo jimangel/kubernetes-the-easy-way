@@ -77,18 +77,18 @@ resource "digitalocean_droplet" "control_plane" {
   size               = var.droplet_size
   user_data          = <<EOF
 #cloud-config
-chpasswd:
-  list: |
-    root:randomdumbdisabledstring
-  expire: false
+ssh_pwauth: false
 users:
-  - name: root
+  - name: kubernetes
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    groups: sudo
+    shell: /bin/bash
     ssh-authorized-keys:
       - "${file("${var.pub_key}")}"
 EOF
 
   connection {
-    user           = "root"
+    user           = "kubernetes"
     host           = self.ipv4_address
     type           = "ssh"
     agent          = false
@@ -123,38 +123,38 @@ EOF
     inline = [
       # GENERAL REPO SPEEDUP
       "until [ -f /var/lib/cloud/instance/boot-finished ]; do sleep 1; done",
-      "echo '' > /etc/apt/sources.list",
-      "add-apt-repository -y 'deb http://mirrors.digitalocean.com/ubuntu/ jammy main restricted universe'",
+      "echo '' | sudo tee /etc/apt/sources.list",
+      "sudo add-apt-repository -y 'deb http://mirrors.digitalocean.com/ubuntu/ jammy main restricted universe'",
       # ADD KUBERNETES REPO
-      "curl -fsSLo /etc/apt/keyrings/kubernetes-archive-keyring.gpg https://packages.cloud.google.com/apt/doc/apt-key.gpg",
+      "sudo curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg -o /etc/apt/keyrings/kubernetes-archive-keyring.gpg",
       "echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-archive-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main' | sudo tee /etc/apt/sources.list.d/kubernetes.list",
       # INSTALL containerd
       "curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg",
       "echo 'deb [signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu jammy stable' | sudo tee /etc/apt/sources.list.d/docker.list",
-      "apt update && apt install containerd.io -y",
-      "containerd config default > /etc/containerd/config.toml",
-      "sed -i 's~SystemdCgroup = false~SystemdCgroup = true~g' /etc/containerd/config.toml",
-      "systemctl enable containerd",
+      "sudo apt update && sudo apt install containerd.io -y",
+      "containerd config default | sudo tee /etc/containerd/config.toml",
+      "sudo sed -i 's~SystemdCgroup = false~SystemdCgroup = true~g' /etc/containerd/config.toml",
+      "sudo systemctl enable containerd",
       # fix crictl (avoids deprecated failure error around dockershim)
-      "printf 'runtime-endpoint: unix:///run/containerd/containerd.sock' > /etc/crictl.yaml",
+      "printf 'runtime-endpoint: unix:///run/containerd/containerd.sock' | sudo tee /etc/crictl.yaml",
       # containerd CNI
       "curl -Lo 'cni-plugins-linux.tgz' https://github.com/containernetworking/plugins/releases/download/v1.2.0/cni-plugins-linux-amd64-v1.2.0.tgz",
-      "mkdir -p /opt/cni/bin",
-      "tar Cxzvf /opt/cni/bin cni-plugins-linux.tgz",
-      "systemctl restart containerd",
+      "sudo mkdir -p /opt/cni/bin",
+      "sudo tar Cxzvf /opt/cni/bin cni-plugins-linux.tgz",
+      "sudo systemctl restart containerd",
       # KUBEADM TWEAKS
-      "printf 'overlay\nbr_netfilter\n' > /etc/modules-load.d/k8s.conf",
-      "modprobe overlay",
-      "modprobe br_netfilter",
-      "printf 'net.bridge.bridge-nf-call-iptables = 1\nnet.ipv4.ip_forward = 1\nnet.bridge.bridge-nf-call-ip6tables = 1\n' > /etc/sysctl.d/k8s.conf",
-      "sysctl --system",
+      "printf 'overlay\nbr_netfilter\n' | sudo tee /etc/modules-load.d/k8s.conf",
+      "sudo modprobe overlay",
+      "sudo modprobe br_netfilter",
+      "printf 'net.bridge.bridge-nf-call-iptables = 1\nnet.ipv4.ip_forward = 1\nnet.bridge.bridge-nf-call-ip6tables = 1\n' | sudo tee /etc/sysctl.d/k8s.conf",
+      "sudo sysctl --system",
       # INSTALL KUBEADM
-      "apt install -y kubectl=${var.kubernetes_version}-00 kubelet=${var.kubernetes_version}-00 kubeadm=${var.kubernetes_version}-00 -f",
-      # apt install -y kubectl=1.26.3-00 kubelet=1.26.3-00 kubeadm=1.26.3-00 -f
+      "sudo apt install -y kubectl=${var.kubernetes_version}-00 kubelet=${var.kubernetes_version}-00 kubeadm=${var.kubernetes_version}-00 -f",
+      # sudo apt install -y kubectl=1.26.3-00 kubelet=1.26.3-00 kubeadm=1.26.3-00 -f
       # KUBEADM INIT THE CONTROL PLANE
-      "kubeadm init --config=/tmp/kubeadm-config.yaml",
+      "sudo kubeadm init --config=/tmp/kubeadm-config.yaml",
       # SETUP KUBECTL REMOTELY
-     "mkdir -p /root/.kube && cp -i /etc/kubernetes/admin.conf /root/.kube/config && chown $(id -u):$(id -g) /root/.kube/config"
+      "mkdir -p $HOME/.kube && sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config && sudo chown $(id -u):$(id -g) $HOME/.kube/config"
     ]
   }
 
@@ -185,18 +185,18 @@ resource "digitalocean_droplet" "worker" {
   size               = var.droplet_size
   user_data          = <<EOF
 #cloud-config
-chpasswd:
-  list: |
-    root:randomdumbdisabledstring
-  expire: false
+ssh_pwauth: false
 users:
-  - name: root
+  - name: kubernetes
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    groups: sudo
+    shell: /bin/bash
     ssh-authorized-keys:
       - "${file("${var.pub_key}")}"
 EOF
 
   connection {
-    user           = "root"
+    user           = "kubernetes"
     host           = self.ipv4_address
     type           = "ssh"
     agent          = false
@@ -224,37 +224,38 @@ EOF
   ############################################
   provisioner "remote-exec" {
     inline = [
-        # GENERAL REPO SPEEDUP
-        "until [ -f /var/lib/cloud/instance/boot-finished ]; do sleep 1; done",
-        "echo '' > /etc/apt/sources.list",
-        "add-apt-repository -y 'deb http://mirrors.digitalocean.com/ubuntu/ jammy main restricted universe'",
-        # ADD KUBERNETES REPO
-        "curl -fsSLo /etc/apt/keyrings/kubernetes-archive-keyring.gpg https://packages.cloud.google.com/apt/doc/apt-key.gpg",
-        "echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-archive-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main' | sudo tee /etc/apt/sources.list.d/kubernetes.list",
-        # INSTALL containerd
-        "curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg",
-        "echo 'deb [signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu jammy stable' | sudo tee /etc/apt/sources.list.d/docker.list",
-        "apt update && apt install containerd.io -y",
-        "containerd config default > /etc/containerd/config.toml",
-        "sed -i 's~SystemdCgroup = false~SystemdCgroup = true~g' /etc/containerd/config.toml",
-        "systemctl enable containerd",
-        # fix crictl (avoids deprecated failure error around dockershim)
-        "printf 'runtime-endpoint: unix:///run/containerd/containerd.sock' > /etc/crictl.yaml",
-        # containerd CNI
-        "curl -Lo 'cni-plugins-linux.tgz' https://github.com/containernetworking/plugins/releases/download/v1.2.0/cni-plugins-linux-amd64-v1.2.0.tgz",
-        "mkdir -p /opt/cni/bin",
-        "tar Cxzvf /opt/cni/bin cni-plugins-linux.tgz",
-        "systemctl restart containerd",
-        # KUBEADM TWEAKS
-        "printf 'overlay\nbr_netfilter\n' > /etc/modules-load.d/containerd.conf",
-        "modprobe overlay",
-        "modprobe br_netfilter",
-        "printf 'net.bridge.bridge-nf-call-iptables = 1\nnet.ipv4.ip_forward = 1\nnet.bridge.bridge-nf-call-ip6tables = 1\n' > /etc/sysctl.d/99-kubernetes-cri.conf",
-        "sysctl --system",
-        # INSTALL KUBEADM
-        "apt install -y kubectl=${var.kubernetes_version}-00 kubelet=${var.kubernetes_version}-00 kubeadm=${var.kubernetes_version}-00 -f",
-        # KUBEADM JOIN THE WORKER
-        "kubeadm join --config=/tmp/kubeadm-config.yaml"
+      # GENERAL REPO SPEEDUP
+      "until [ -f /var/lib/cloud/instance/boot-finished ]; do sleep 1; done",
+      "echo '' | sudo tee /etc/apt/sources.list",
+      "sudo add-apt-repository -y 'deb http://mirrors.digitalocean.com/ubuntu/ jammy main restricted universe'",
+      # ADD KUBERNETES REPO
+      "sudo curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg -o /etc/apt/keyrings/kubernetes-archive-keyring.gpg",
+      "echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-archive-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main' | sudo tee /etc/apt/sources.list.d/kubernetes.list",
+      # INSTALL containerd
+      "curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg",
+      "echo 'deb [signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu jammy stable' | sudo tee /etc/apt/sources.list.d/docker.list",
+      "sudo apt update && sudo apt install containerd.io -y",
+      "containerd config default | sudo tee /etc/containerd/config.toml",
+      "sudo sed -i 's~SystemdCgroup = false~SystemdCgroup = true~g' /etc/containerd/config.toml",
+      "sudo systemctl enable containerd",
+      # fix crictl (avoids deprecated failure error around dockershim)
+      "printf 'runtime-endpoint: unix:///run/containerd/containerd.sock' | sudo tee /etc/crictl.yaml",
+      # containerd CNI
+      "curl -Lo 'cni-plugins-linux.tgz' https://github.com/containernetworking/plugins/releases/download/v1.2.0/cni-plugins-linux-amd64-v1.2.0.tgz",
+      "sudo mkdir -p /opt/cni/bin",
+      "sudo tar Cxzvf /opt/cni/bin cni-plugins-linux.tgz",
+      "sudo systemctl restart containerd",
+      # KUBEADM TWEAKS
+      "printf 'overlay\nbr_netfilter\n' | sudo tee /etc/modules-load.d/k8s.conf",
+      "sudo modprobe overlay",
+      "sudo modprobe br_netfilter",
+      "printf 'net.bridge.bridge-nf-call-iptables = 1\nnet.ipv4.ip_forward = 1\nnet.bridge.bridge-nf-call-ip6tables = 1\n' | sudo tee /etc/sysctl.d/k8s.conf",
+      "sudo sysctl --system",
+      # INSTALL KUBEADM
+      "sudo apt install -y kubectl=${var.kubernetes_version}-00 kubelet=${var.kubernetes_version}-00 kubeadm=${var.kubernetes_version}-00 -f",
+      # sudo apt install -y kubectl=1.26.3-00 kubelet=1.26.3-00 kubeadm=1.26.3-00 -f
+      # KUBEADM JOIN THE WORKER
+      "sudo kubeadm join --config=/tmp/kubeadm-config.yaml"
     ]
   }
 }

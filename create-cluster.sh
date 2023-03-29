@@ -14,5 +14,5 @@ terraform init
 
 # plan the deployment
 #terraform plan -var "do_token=${DO_PAT}"
-
-terraform apply -auto-approve -var "do_token=${DO_PAT}"
+#-auto-approve
+terraform apply  -var "do_token=${DO_PAT}"

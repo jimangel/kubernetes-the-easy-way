@@ -33,21 +33,21 @@ The default configuration creates (3) 2CPUx2GB nodes ($15 a month or $0.02232 an
 
     ```
     # check by running
-    ls -l ~/.ssh/id_rsa.pub
+    ls -l $HOME/.ssh/id_ed25519.pub
 
-    # if not found, run the following command (enter to take defaults)
-    ssh-keygen
+    # if not found, run the following command (pressing `enter` to take defaults)
+    ssh-keygen -t ed25519
 
     # add the key to your ssh agent
-    ssh-add ~/.ssh/id_rsa
+    ssh-add $HOME/.ssh/id_ed25519
     ```
     
     To create and/or use a unique SSH key:
 
     ```
     # create
-    ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa_ktew
-    ssh-add ~/.ssh/id_rsa_ktew
+    ssh-keygen -t rsa -b 4096 -f $HOME/.ssh/id_ed25519_ktew
+    ssh-add $HOME/.ssh/id_ed25519_ktew
     ```
 
 - The default SSH key is NOT uploaded to Digital Ocean already. If the SSH key is already uploaded, create a new one or delete the old one ([here](https://cloud.digitalocean.com/account/security))
@@ -65,14 +65,16 @@ The default configuration creates (3) 2CPUx2GB nodes ($15 a month or $0.02232 an
 - Export your SSH public key:
 
    ```
-   export TF_VAR_pub_key="$HOME/.ssh/id_rsa.pub"
+   export TF_VAR_pub_key="$HOME/.ssh/id_ed25519.pub"
    ```
 
 - Export your SSH private key:
 
    ```
-   export TF_VAR_pvt_key="$HOME/.ssh/id_rsa"
+   export TF_VAR_pvt_key="$HOME/.ssh/id_ed25519"
    ```
+
+> Note: "For Ubuntu 22.04, OpenSSH was updated to v8.x and rsa host keys are disabled by default. Either a client key using ecc needs to be used, or reenable rsa on the host side." ([source with other tips](https://github.com/hashicorp/packer/issues/11733#issuecomment-1106545943)). I don't think this applies to my droplets, but worth keeping in mind moving forward.
 
 ### Deploy Kubernetes
 
@@ -90,13 +92,11 @@ Build the cluster:
 ./create-cluster.sh
 ```
 
-It should take ~30 minutes to complete (`2.16s user 1.68s system 0% cpu 29:13.02 total`)
-
-Once finished, check it out!
+It should take ~10 minutes to complete. Once finished, check it out!
 
 ```
 # copy the cluster-admin kubeconfig from the control plane node
-scp root@$(terraform output -json control_plane_ip | jq -r '.[]'):/etc/kubernetes/admin.conf ${HOME}/admin.conf
+scp kubernetes@$(terraform output -json control_plane_ip | jq -r '.[]'):/home/kubernetes/.kube/config ${HOME}/admin.conf
 
 # export the kubeconfig
 export KUBECONFIG=${HOME}/admin.conf
@@ -140,13 +140,13 @@ kube-system   kube-scheduler-control-plane-nyc3-1            1/1     Running   0
 SSH into any of the nodes
 ```
 # control-plane-1
-ssh root@$(terraform output -json control_plane_ip | jq -r '.[]')
+ssh kubernetes@$(terraform output -json control_plane_ip | jq -r '.[]')
 
 # worker-1
-ssh root@$(terraform output -json worker_ip | jq -r '.[0]')
+ssh kubernetes@$(terraform output -json worker_ip | jq -r '.[0]')
 
 # worker-2
-ssh root@$(terraform output -json worker_ip | jq -r '.[1]')
+ssh kubernetes@$(terraform output -json worker_ip | jq -r '.[1]')
 ```
 
 Deploy NGINX
@@ -157,14 +157,18 @@ kubectl port-forward deployment/nginx 8080:80
 # visit http://localhost:8080 in a browser
 ```
 
-Run Cilium connectivity test
+Run Cilium connectivity test:
+
 ```
 kubectl apply -f https://raw.githubusercontent.com/cilium/cilium/v1.13/examples/kubernetes/connectivity-check/connectivity-check.yaml
 
 # check: kubectl get pods -A
 ```
 
-Use cluster context
+The connectivity test should have all pods running `1/1` after some time (under 5 minutes).
+
+Use a cluster context:
+
 ```
 kubectl config use-context $(terraform output cluster_context)
 ```
@@ -187,8 +191,3 @@ Most of these resources are meant to be completed in order and build on each pre
 - How to [use Dex as an OIDC provider](docs/setup-dex-oidc.md) for kubectl authentication with GitHub.
 - How to [deploy the Prometheus Operator](docs/setup-prometheus-operator.md) for monitoring.
 - How to [create multi-region clusters](docs/multi-cluster-testing.md) for advanced testing.
-
-(upcoming resources)
-
-- prometheus / grafana
-- harbor
