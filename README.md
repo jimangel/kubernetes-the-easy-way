@@ -12,7 +12,7 @@ Kubernetes The Easy Way is a complement to [Kubernetes The Hard Way](https://git
 
 Terraform is used to deploy and destroy a Kubernetes cluster on DigitalOcean via kubeadm. By default, the script deploys 1 control-plane-node and 2 worker-nodes.
 
-The default configuration creates (3) 2CPUx2GB nodes ($15 a month or $0.02232 an hour). I use it to spin up, test, and tear down. Total cost of ownership is $45 a month or $0.067 an hour. If I spun up a cluster and tested for 24 hours then destroyed it, it would cost $1.60 - pretty affordable!
+The default configuration creates (3) 2CPUx2GB nodes ($18 a month or $0.027 an hour). I use it to spin up, test, and tear down. Total cost of ownership is $54 a month or $0.081 an hour. If I spun up a cluster and tested for 24 hours then destroyed it, it would cost $1.94 - pretty affordable!
 
 > Note: I've written and tested this code on Ubuntu 22.04, PRs are welcome if you'd like this to support other OSes!
 
@@ -50,7 +50,7 @@ The default configuration creates (3) 2CPUx2GB nodes ($15 a month or $0.02232 an
     ssh-add $HOME/.ssh/id_ed25519_ktew
     ```
 
-- The default SSH key is NOT uploaded to Digital Ocean already. If the SSH key is already uploaded, create a new one or delete the old one ([here](https://cloud.digitalocean.com/account/security))
+    This SSH key is for authentication to the server(s) and passed via `cloud-init` vs. droplet `ssh_keys` resource in [kubernetes-terraform-code.tf](kubernetes-terraform-code.tf).
 
 ### Prerequisites
 
@@ -96,7 +96,7 @@ It should take ~10 minutes to complete. Once finished, check it out!
 
 ```
 # copy the cluster-admin kubeconfig from the control plane node
-scp kubernetes@$(terraform output -json control_plane_ip | jq -r '.[]'):/home/kubernetes/.kube/config ${HOME}/admin.conf
+scp -i ${TF_VAR_pub_key} kubernetes@$(terraform output -json control_plane_ip | jq -r '.[]'):/home/kubernetes/.kube/config ${HOME}/admin.conf
 
 # export the kubeconfig
 export KUBECONFIG=${HOME}/admin.conf
@@ -140,13 +140,13 @@ kube-system   kube-scheduler-control-plane-nyc3-1            1/1     Running   0
 SSH into any of the nodes
 ```
 # control-plane-1
-ssh kubernetes@$(terraform output -json control_plane_ip | jq -r '.[]')
+ssh -i ${TF_VAR_pub_key} kubernetes@$(terraform output -json control_plane_ip | jq -r '.[]')
 
 # worker-1
-ssh kubernetes@$(terraform output -json worker_ip | jq -r '.[0]')
+ssh -i ${TF_VAR_pub_key} kubernetes@$(terraform output -json worker_ip | jq -r '.[0]')
 
 # worker-2
-ssh kubernetes@$(terraform output -json worker_ip | jq -r '.[1]')
+ssh -i ${TF_VAR_pub_key} kubernetes@$(terraform output -json worker_ip | jq -r '.[1]')
 ```
 
 Deploy NGINX
@@ -191,3 +191,23 @@ Most of these resources are meant to be completed in order and build on each pre
 - How to [use Dex as an OIDC provider](docs/setup-dex-oidc.md) for kubectl authentication with GitHub.
 - How to [deploy the Prometheus Operator](docs/setup-prometheus-operator.md) for monitoring.
 - How to [create multi-region clusters](docs/multi-cluster-testing.md) for advanced testing.
+- [Metrics server](https://artifacthub.io/packages/helm/metrics-server/metrics-server): `noglob helm upgrade --install metrics-server metrics-server/metrics-server --set args[0]='--kubelet-insecure-tls'`
+
+Find the fastest region ping one-liner:
+
+```
+{
+    curl -w "%{url_effective};%{time_connect}\n" -o /dev/null -s http://speedtest-nyc1.digitalocean.com/
+    curl -w "%{url_effective};%{time_connect}\n" -o /dev/null -s http://speedtest-nyc2.digitalocean.com/
+    curl -w "%{url_effective};%{time_connect}\n" -o /dev/null -s http://speedtest-nyc3.digitalocean.com/
+    curl -w "%{url_effective};%{time_connect}\n" -o /dev/null -s http://speedtest-ams2.digitalocean.com/
+    curl -w "%{url_effective};%{time_connect}\n" -o /dev/null -s http://speedtest-ams3.digitalocean.com/
+    curl -w "%{url_effective};%{time_connect}\n" -o /dev/null -s http://speedtest-sfo1.digitalocean.com/
+    curl -w "%{url_effective};%{time_connect}\n" -o /dev/null -s http://speedtest-sfo2.digitalocean.com/
+    curl -w "%{url_effective};%{time_connect}\n" -o /dev/null -s http://speedtest-sgp1.digitalocean.com/
+    curl -w "%{url_effective};%{time_connect}\n" -o /dev/null -s http://speedtest-lon1.digitalocean.com/
+    curl -w "%{url_effective};%{time_connect}\n" -o /dev/null -s http://speedtest-fra1.digitalocean.com/
+    curl -w "%{url_effective};%{time_connect}\n" -o /dev/null -s http://speedtest-tor1.digitalocean.com/
+    curl -w "%{url_effective};%{time_connect}\n" -o /dev/null -s http://speedtest-blr1.digitalocean.com/
+} | sort -t';' -k2
+```

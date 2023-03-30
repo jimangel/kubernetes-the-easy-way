@@ -20,8 +20,7 @@ cert-manager jetstack/cert-manager \
 --namespace cert-manager \
 --create-namespace \
 --version v1.11.0 \
---set installCRDs=true \
-
+--set installCRDs=true
 ```
 
 > https://cert-manager.io/docs/installation/kubernetes/#verifying-the-installation

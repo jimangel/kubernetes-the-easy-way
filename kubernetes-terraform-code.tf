@@ -63,12 +63,6 @@ resource "random_string" "lower" {
 #### CREATE CONTROL PLANE NODE(S) ####
 ######################################
 
-# Use SSH key
-#resource "digitalocean_ssh_key" "terraform" {
-#  name       = "terraform-kube-easy"
-#  public_key = file(var.pub_key)
-#}
-
 resource "digitalocean_droplet" "control_plane" {
   count              = 1
   image              = var.do_image
