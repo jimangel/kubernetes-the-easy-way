@@ -14,6 +14,10 @@
 # https://github.com/kubernetes/sig-release/blob/master/releases/patch-releases.md#timelines
 variable "kubernetes_version" { default = "1.26.3" }
 
+locals {
+  k8s_major_minor = join(".", slice(split(".", var.kubernetes_version), 0, 2))
+}
+
 # Note: Cilium no longer releases a deployment file and rely on helm now.
 # to generate:
 # helm repo add cilium https://helm.cilium.io/ && helm repo update
@@ -117,11 +121,13 @@ EOF
     inline = [
       # GENERAL REPO SPEEDUP
       "until [ -f /var/lib/cloud/instance/boot-finished ]; do sleep 1; done",
+      # disable interactive prompt
+      "printf '$nrconf{restart} = '\\''l'\\''\\n' | sudo tee /etc/needrestart/conf.d/ktew.conf",
       "echo '' | sudo tee /etc/apt/sources.list",
       "sudo add-apt-repository -y 'deb http://mirrors.digitalocean.com/ubuntu/ jammy main restricted universe'",
       # ADD KUBERNETES REPO
-      "sudo curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg -o /etc/apt/keyrings/kubernetes-archive-keyring.gpg",
-      "echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-archive-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main' | sudo tee /etc/apt/sources.list.d/kubernetes.list",
+      "sudo curl -fsSL https://pkgs.k8s.io/core:/stable:/v${local.k8s_major_minor}/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg",
+      "echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v${local.k8s_major_minor}/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list",
       # INSTALL containerd
       "curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg",
       "echo 'deb [signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu jammy stable' | sudo tee /etc/apt/sources.list.d/docker.list",
@@ -143,8 +149,7 @@ EOF
       "printf 'net.bridge.bridge-nf-call-iptables = 1\nnet.ipv4.ip_forward = 1\nnet.bridge.bridge-nf-call-ip6tables = 1\n' | sudo tee /etc/sysctl.d/k8s.conf",
       "sudo sysctl --system",
       # INSTALL KUBEADM
-      "sudo apt install -y kubectl=${var.kubernetes_version}-00 kubelet=${var.kubernetes_version}-00 kubeadm=${var.kubernetes_version}-00 -f",
-      # sudo apt install -y kubectl=1.26.3-00 kubelet=1.26.3-00 kubeadm=1.26.3-00 -f
+      "sudo apt install -y kubectl kubelet kubeadm -f",
       # KUBEADM INIT THE CONTROL PLANE
       "sudo kubeadm init --config=/tmp/kubeadm-config.yaml",
       # SETUP KUBECTL REMOTELY
@@ -220,11 +225,13 @@ EOF
     inline = [
       # GENERAL REPO SPEEDUP
       "until [ -f /var/lib/cloud/instance/boot-finished ]; do sleep 1; done",
+      # disable interactive prompt
+      "printf '$nrconf{restart} = '\\''l'\\''\\n' | sudo tee /etc/needrestart/conf.d/ktew.conf",
       "echo '' | sudo tee /etc/apt/sources.list",
       "sudo add-apt-repository -y 'deb http://mirrors.digitalocean.com/ubuntu/ jammy main restricted universe'",
       # ADD KUBERNETES REPO
-      "sudo curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg -o /etc/apt/keyrings/kubernetes-archive-keyring.gpg",
-      "echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-archive-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main' | sudo tee /etc/apt/sources.list.d/kubernetes.list",
+      "sudo curl -fsSL https://pkgs.k8s.io/core:/stable:/v${local.k8s_major_minor}/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg",
+      "echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v${local.k8s_major_minor}/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list",
       # INSTALL containerd
       "curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg",
       "echo 'deb [signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu jammy stable' | sudo tee /etc/apt/sources.list.d/docker.list",
@@ -246,8 +253,7 @@ EOF
       "printf 'net.bridge.bridge-nf-call-iptables = 1\nnet.ipv4.ip_forward = 1\nnet.bridge.bridge-nf-call-ip6tables = 1\n' | sudo tee /etc/sysctl.d/k8s.conf",
       "sudo sysctl --system",
       # INSTALL KUBEADM
-      "sudo apt install -y kubectl=${var.kubernetes_version}-00 kubelet=${var.kubernetes_version}-00 kubeadm=${var.kubernetes_version}-00 -f",
-      # sudo apt install -y kubectl=1.26.3-00 kubelet=1.26.3-00 kubeadm=1.26.3-00 -f
+      "sudo apt install -y kubectl kubelet kubeadm -f",      
       # KUBEADM JOIN THE WORKER
       "sudo kubeadm join --config=/tmp/kubeadm-config.yaml"
     ]
