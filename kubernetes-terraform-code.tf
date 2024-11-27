@@ -12,7 +12,7 @@
 ##################################
 
 # https://github.com/kubernetes/sig-release/blob/master/releases/patch-releases.md#timelines
-variable "kubernetes_version" { default = "1.26.3" }
+variable "kubernetes_version" { default = "1.31.3" }
 
 locals {
   k8s_major_minor = join(".", slice(split(".", var.kubernetes_version), 0, 2))

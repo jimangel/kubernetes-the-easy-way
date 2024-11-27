@@ -58,9 +58,9 @@ The default configuration creates (3) 2CPUx2GB nodes ($18 a month or $0.027 an h
 
 - Export a [DigitalOcean Personal Access Token](https://www.digitalocean.com/docs/apis-clis/api/create-personal-access-token/) with **WRITE** access:
 
-    ```
-    export DO_PAT="<DIGITALOCEAN PERSONAL ACCESS TOKEN>"
-    ```
+   ```
+   export DO_PAT="<DIGITALOCEAN PERSONAL ACCESS TOKEN>"
+   ```
 
 - Export your SSH public key:
 
@@ -96,7 +96,7 @@ It should take ~10 minutes to complete. Once finished, check it out!
 
 ```
 # copy the cluster-admin kubeconfig from the control plane node
-scp -i ${TF_VAR_pub_key} kubernetes@$(terraform output -json control_plane_ip | jq -r '.[]'):/home/kubernetes/.kube/config ${HOME}/admin.conf
+scp -i ${TF_VAR_pvt_key} kubernetes@$(terraform output -json control_plane_ip | jq -r '.[]'):/home/kubernetes/.kube/config ${HOME}/admin.conf
 
 # export the kubeconfig
 export KUBECONFIG=${HOME}/admin.conf
@@ -140,13 +140,13 @@ kube-system   kube-scheduler-control-plane-nyc3-1            1/1     Running   0
 SSH into any of the nodes
 ```
 # control-plane-1
-ssh -i ${TF_VAR_pub_key} kubernetes@$(terraform output -json control_plane_ip | jq -r '.[]')
+ssh -i ${TF_VAR_pvt_key} kubernetes@$(terraform output -json control_plane_ip | jq -r '.[]')
 
 # worker-1
-ssh -i ${TF_VAR_pub_key} kubernetes@$(terraform output -json worker_ip | jq -r '.[0]')
+ssh -i ${TF_VAR_pvt_key} kubernetes@$(terraform output -json worker_ip | jq -r '.[0]')
 
 # worker-2
-ssh -i ${TF_VAR_pub_key} kubernetes@$(terraform output -json worker_ip | jq -r '.[1]')
+ssh -i ${TF_VAR_pvt_key} kubernetes@$(terraform output -json worker_ip | jq -r '.[1]')
 ```
 
 Deploy NGINX
