@@ -2,7 +2,6 @@
 #### TODO ####
 ##############
 
-# containerd swap
 # security
 # multi-master
 # block storage
@@ -21,7 +20,9 @@ locals {
 # Note: Cilium no longer releases a deployment file and rely on helm now.
 # to generate:
 # helm repo add cilium https://helm.cilium.io/ && helm repo update
-# helm template cilium cilium/cilium --version 1.13.1 --namespace kube-system > cilium-install.yaml
+# helm search repo cilium/cilium --versions | head
+# rm -rf cilium-install.yaml
+# helm template cilium cilium/cilium --version 1.16.5 --namespace kube-system > cilium-install.yaml
 # https://github.com/cilium/cilium/releases
 
 variable "pod_subnet" { default = "10.217.0.0/16" }

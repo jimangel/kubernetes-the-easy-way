@@ -12,15 +12,15 @@ Kubernetes The Easy Way is a complement to [Kubernetes The Hard Way](https://git
 
 Terraform is used to deploy and destroy a Kubernetes cluster on DigitalOcean via kubeadm. By default, the script deploys 1 control-plane-node and 2 worker-nodes.
 
-The default configuration creates (3) 2CPUx2GB nodes ($18 a month or $0.027 an hour). I use it to spin up, test, and tear down. Total cost of ownership is $54 a month or $0.081 an hour. If I spun up a cluster and tested for 24 hours then destroyed it, it would cost $1.94 - pretty affordable!
+The default configuration creates (3) 2CPUx2GB nodes ($18 a month or $0.027 an hour each). I use it to spin up, test, and tear down. Total cost of ownership is $54 a month or $0.081 an hour. If I spun up a cluster and tested for 24 hours then destroyed it, it would cost $1.94 - pretty affordable!
 
 > Note: I've written and tested this code on Ubuntu 22.04, PRs are welcome if you'd like this to support other OSes!
 
 ### Cluster details
 
-* [kubernetes](https://github.com/kubernetes/kubernetes) v1.26.3
-* [containerd](https://containerd.io/) v1.6.19
-* [cilium cni](https://github.com/cilium/cilium) v1.13.1
+* [kubernetes](https://github.com/kubernetes/kubernetes) v1.32.0
+* [containerd](https://containerd.io/) v1.7.2
+* [cilium cni](https://github.com/cilium/cilium) v1.16.5
 * [ubuntu](https://ubuntu.com/) 22.04 LTS
 
 > Note: https://kubernetes.io/blog/2022/11/18/upcoming-changes-in-kubernetes-1-26/#cri-api-removal
@@ -54,9 +54,9 @@ The default configuration creates (3) 2CPUx2GB nodes ($18 a month or $0.027 an h
 
 ### Prerequisites
 
-- Install [Terraform](https://learn.hashicorp.com/terraform/getting-started/install.html#install-terraform) (tested on v1.3.8)
+- Install [Terraform](https://learn.hashicorp.com/terraform/getting-started/install.html#install-terraform) (tested on v1.10.3)
 
-- Export a [DigitalOcean Personal Access Token](https://www.digitalocean.com/docs/apis-clis/api/create-personal-access-token/) with **WRITE** access:
+- Export a [DigitalOcean Personal Access Token](https://www.digitalocean.com/docs/apis-clis/api/create-personal-access-token/) with **Full Access** (TODO: descope to just droplets / networking):
 
    ```
    export DO_PAT="<DIGITALOCEAN PERSONAL ACCESS TOKEN>"
@@ -89,10 +89,14 @@ cd kubernetes-the-easy-way
 Build the cluster:
 
 ```
+# checks env vars and runs terraform init / apply
 ./create-cluster.sh
+
+# Do you want to perform these actions?
+# yes
 ```
 
-It should take ~10 minutes to complete. Once finished, check it out!
+It should take ~5 minutes to complete. Once finished, check it out!
 
 ```
 # copy the cluster-admin kubeconfig from the control plane node
@@ -110,27 +114,30 @@ Output sample:
 
 ```
 % kubectl get nodes
-NAME                   STATUS   ROLES           AGE   VERSION
-control-plane-nyc3-1   Ready    control-plane   22m   v1.26.3
-worker-nyc3-1          Ready    <none>          15m   v1.26.3
-worker-nyc3-2          Ready    <none>          10m   v1.26.3
+NAME                   STATUS   ROLES           AGE     VERSION
+control-plane-nyc3-1   Ready    control-plane   3m47s   v1.32.0
+worker-nyc3-1          Ready    <none>          78s     v1.32.0
+worker-nyc3-2          Ready    <none>          78s     v1.32.0
 
 % kubectl get pods -A
 NAMESPACE     NAME                                           READY   STATUS    RESTARTS   AGE
-kube-system   cilium-9bh82                                   1/1     Running   0          22m
-kube-system   cilium-gm22n                                   1/1     Running   0          15m
-kube-system   cilium-operator-56486f49cd-dhf9k               1/1     Running   0          22m
-kube-system   cilium-operator-56486f49cd-k6l7v               1/1     Running   0          22m
-kube-system   cilium-xhnrm                                   1/1     Running   0          10m
-kube-system   coredns-787d4945fb-6c252                       1/1     Running   0          22m
-kube-system   coredns-787d4945fb-9jvqw                       1/1     Running   0          22m
-kube-system   etcd-control-plane-nyc3-1                      1/1     Running   0          22m
-kube-system   kube-apiserver-control-plane-nyc3-1            1/1     Running   0          22m
-kube-system   kube-controller-manager-control-plane-nyc3-1   1/1     Running   0          22m
-kube-system   kube-proxy-626n7                               1/1     Running   0          10m
-kube-system   kube-proxy-7sk5f                               1/1     Running   0          15m
-kube-system   kube-proxy-v8hqf                               1/1     Running   0          22m
-kube-system   kube-scheduler-control-plane-nyc3-1            1/1     Running   0          22m
+kube-system   cilium-9wzmj                                   1/1     Running   0          98s
+kube-system   cilium-envoy-4trx8                             1/1     Running   0          86s
+kube-system   cilium-envoy-kt8nv                             1/1     Running   0          3m57s
+kube-system   cilium-envoy-rh2jd                             1/1     Running   0          98s
+kube-system   cilium-nfh47                                   1/1     Running   0          86s
+kube-system   cilium-operator-799f498c8-djrdk                1/1     Running   0          3m57s
+kube-system   cilium-operator-799f498c8-kslzj                1/1     Running   0          3m57s
+kube-system   cilium-sjwqc                                   1/1     Running   0          3m57s
+kube-system   coredns-668d6bf9bc-nc7pw                       1/1     Running   0          3m57s
+kube-system   coredns-668d6bf9bc-s7qs9                       1/1     Running   0          3m57s
+kube-system   etcd-control-plane-nyc3-1                      1/1     Running   0          4m1s
+kube-system   kube-apiserver-control-plane-nyc3-1            1/1     Running   0          4m1s
+kube-system   kube-controller-manager-control-plane-nyc3-1   1/1     Running   0          4m1s
+kube-system   kube-proxy-2lf26                               1/1     Running   0          98s
+kube-system   kube-proxy-2r47b                               1/1     Running   0          3m57s
+kube-system   kube-proxy-lb4d9                               1/1     Running   0          86s
+kube-system   kube-scheduler-control-plane-nyc3-1            1/1     Running   0          4m1s
 ```
 
 ---
@@ -160,9 +167,9 @@ kubectl port-forward deployment/nginx 8080:80
 Run Cilium connectivity test:
 
 ```
-kubectl apply -f https://raw.githubusercontent.com/cilium/cilium/v1.13/examples/kubernetes/connectivity-check/connectivity-check.yaml
+kubectl apply -f https://raw.githubusercontent.com/cilium/cilium/v1.16/examples/kubernetes/connectivity-check/connectivity-check.yaml
 
-# check: kubectl get pods -A
+# check: kubectl get pods --watch
 ```
 
 The connectivity test should have all pods running `1/1` after some time (under 5 minutes).
@@ -179,6 +186,9 @@ kubectl config use-context $(terraform output cluster_context)
 
 ```
 ./destroy-cluster.sh
+
+# Do you really want to destroy all resources?
+# yes
 ```
 
 ### Additional resources:
