@@ -14,14 +14,14 @@ Terraform is used to deploy and destroy a Kubernetes cluster on DigitalOcean via
 
 The default configuration creates (3) 2CPUx2GB nodes ($18 a month or $0.027 an hour each). I use it to spin up, test, and tear down. Total cost of ownership is $54 a month or $0.081 an hour. If I spun up a cluster and tested for 24 hours then destroyed it, it would cost $1.94 - pretty affordable!
 
-> Note: I've written and tested this code on Ubuntu 22.04, PRs are welcome if you'd like this to support other OSes!
+> Note: I've written and tested this code on Ubuntu 24.04, PRs are welcome if you'd like this to support other OSes!
 
 ### Cluster details
 
 * [kubernetes](https://github.com/kubernetes/kubernetes) v1.32.0
 * [containerd](https://containerd.io/) v1.7.2
 * [cilium cni](https://github.com/cilium/cilium) v1.16.5
-* [ubuntu](https://ubuntu.com/) 22.04 LTS
+* [ubuntu](https://ubuntu.com/) 24.04 LTS
 
 > Note: https://kubernetes.io/blog/2022/11/18/upcoming-changes-in-kubernetes-1-26/#cri-api-removal
 

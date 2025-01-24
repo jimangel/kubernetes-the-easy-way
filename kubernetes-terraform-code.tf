@@ -37,7 +37,7 @@ variable "droplet_size" { default = "s-2vcpu-2gb" }
 
 # set image
 # curl -X GET --silent "https://api.digitalocean.com/v2/images?per_page=999" -H "Authorization: Bearer $DO_PAT" | jq | grep ubuntu  
-variable "do_image" { default = "ubuntu-22-04-x64"}
+variable "do_image" { default = "ubuntu-24-04-x64"}
 
 # set with `export DO_PAT=<API TOKEN>`
 variable "do_token" {}
@@ -125,13 +125,12 @@ EOF
       # disable interactive prompt
       "printf '$nrconf{restart} = '\\''l'\\''\\n' | sudo tee /etc/needrestart/conf.d/ktew.conf",
       "echo '' | sudo tee /etc/apt/sources.list",
-      "sudo add-apt-repository -y 'deb http://mirrors.digitalocean.com/ubuntu/ jammy main restricted universe'",
       # ADD KUBERNETES REPO
       "sudo curl -fsSL https://pkgs.k8s.io/core:/stable:/v${local.k8s_major_minor}/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg",
       "echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v${local.k8s_major_minor}/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list",
       # INSTALL containerd
       "curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg",
-      "echo 'deb [signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu jammy stable' | sudo tee /etc/apt/sources.list.d/docker.list",
+      "echo 'deb [signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu noble stable' | sudo tee /etc/apt/sources.list.d/docker.list",
       "sudo apt update && sudo apt install containerd.io -y",
       "containerd config default | sudo tee /etc/containerd/config.toml",
       "sudo sed -i 's~SystemdCgroup = false~SystemdCgroup = true~g' /etc/containerd/config.toml",
@@ -229,13 +228,12 @@ EOF
       # disable interactive prompt
       "printf '$nrconf{restart} = '\\''l'\\''\\n' | sudo tee /etc/needrestart/conf.d/ktew.conf",
       "echo '' | sudo tee /etc/apt/sources.list",
-      "sudo add-apt-repository -y 'deb http://mirrors.digitalocean.com/ubuntu/ jammy main restricted universe'",
       # ADD KUBERNETES REPO
       "sudo curl -fsSL https://pkgs.k8s.io/core:/stable:/v${local.k8s_major_minor}/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg",
       "echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v${local.k8s_major_minor}/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list",
       # INSTALL containerd
       "curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg",
-      "echo 'deb [signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu jammy stable' | sudo tee /etc/apt/sources.list.d/docker.list",
+      "echo 'deb [signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu noble stable' | sudo tee /etc/apt/sources.list.d/docker.list",
       "sudo apt update && sudo apt install containerd.io -y",
       "containerd config default | sudo tee /etc/containerd/config.toml",
       "sudo sed -i 's~SystemdCgroup = false~SystemdCgroup = true~g' /etc/containerd/config.toml",
