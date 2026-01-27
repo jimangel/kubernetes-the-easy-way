@@ -206,18 +206,15 @@ Most of these resources are meant to be completed in order and build on each pre
 Find the fastest region ping one-liner:
 
 ```
+# using ripe endpoints since DO removed theirs
 {
-    curl -w "%{url_effective};%{time_connect}\n" -o /dev/null -s http://speedtest-nyc1.digitalocean.com/
-    curl -w "%{url_effective};%{time_connect}\n" -o /dev/null -s http://speedtest-nyc2.digitalocean.com/
-    curl -w "%{url_effective};%{time_connect}\n" -o /dev/null -s http://speedtest-nyc3.digitalocean.com/
-    curl -w "%{url_effective};%{time_connect}\n" -o /dev/null -s http://speedtest-ams2.digitalocean.com/
-    curl -w "%{url_effective};%{time_connect}\n" -o /dev/null -s http://speedtest-ams3.digitalocean.com/
-    curl -w "%{url_effective};%{time_connect}\n" -o /dev/null -s http://speedtest-sfo1.digitalocean.com/
-    curl -w "%{url_effective};%{time_connect}\n" -o /dev/null -s http://speedtest-sfo2.digitalocean.com/
-    curl -w "%{url_effective};%{time_connect}\n" -o /dev/null -s http://speedtest-sgp1.digitalocean.com/
-    curl -w "%{url_effective};%{time_connect}\n" -o /dev/null -s http://speedtest-lon1.digitalocean.com/
-    curl -w "%{url_effective};%{time_connect}\n" -o /dev/null -s http://speedtest-fra1.digitalocean.com/
-    curl -w "%{url_effective};%{time_connect}\n" -o /dev/null -s http://speedtest-tor1.digitalocean.com/
-    curl -w "%{url_effective};%{time_connect}\n" -o /dev/null -s http://speedtest-blr1.digitalocean.com/
-} | sort -t';' -k2
+    curl -w "%{url_effective};%{time_connect}\n" -o /dev/null -s http://ca-tor-as14061.anchors.atlas.ripe.net/
+    curl -w "%{url_effective};%{time_connect}\n" -o /dev/null -s http://de-fra-as14061.anchors.atlas.ripe.net/
+    curl -w "%{url_effective};%{time_connect}\n" -o /dev/null -s http://in-blr-as14061.anchors.atlas.ripe.net/
+    curl -w "%{url_effective};%{time_connect}\n" -o /dev/null -s http://nl-ams-as14061.anchors.atlas.ripe.net/
+    curl -w "%{url_effective};%{time_connect}\n" -o /dev/null -s http://sg-sin-as14061.anchors.atlas.ripe.net/
+    curl -w "%{url_effective};%{time_connect}\n" -o /dev/null -s http://uk-lon-as14061.anchors.atlas.ripe.net/
+    curl -w "%{url_effective};%{time_connect}\n" -o /dev/null -s http://us-nyc-as14061.anchors.atlas.ripe.net/
+    curl -w "%{url_effective};%{time_connect}\n" -o /dev/null -s http://us-sjc-as14061.anchors.atlas.ripe.net/
+} | sort -t';' -k2 -n
 ```
