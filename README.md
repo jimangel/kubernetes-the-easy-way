@@ -206,7 +206,6 @@ Most of these resources are meant to be completed in order and build on each pre
 Find the fastest region ping one-liner:
 
 ```
-# using ripe endpoints since DO removed theirs
 {
     curl -w "%{url_effective};%{time_connect}\n" -o /dev/null -s http://ca-tor-as14061.anchors.atlas.ripe.net/
     curl -w "%{url_effective};%{time_connect}\n" -o /dev/null -s http://de-fra-as14061.anchors.atlas.ripe.net/
